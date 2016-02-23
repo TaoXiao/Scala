@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 *.iml
 gradlew
 gradlew.bat
@@ -5,3 +6,22 @@ gradlew.bat
 gradle/
 .idea/
 build/
+=======
+*.class
+*.log
+
+# sbt specific
+.cache
+.history
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+
+# Scala-IDE specific
+.scala_dependencies
+.worksheet
+>>>>>>> e28519a39641c78761552cf56cee8ae18ac42290
