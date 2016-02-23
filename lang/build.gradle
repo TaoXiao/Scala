@@ -1,0 +1,21 @@
+group 'cn.gridx.scala'
+version '1.0-RELEASE'
+
+sourceCompatibility = 1.6
+
+repositories {
+    mavenCentral()
+
+    maven {
+        url 'https://repository.cloudera.com/artifactory/cloudera-repos'
+    }
+}
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.11'
+    compile 'org.apache.hbase:hbase-server:0.98.6-cdh5.3.5',
+            'joda-time:joda-time:2.6',
+            'org.json4s:json4s-jackson_2.10:3.2.11',
+            'org.yaml:snakeyaml:1.13'
+
+}
