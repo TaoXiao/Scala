@@ -1,0 +1,10 @@
+name: CCC
+age: 26
+city: TRUE
+height: 0.015
+
+# details 是一个map
+details:
+  first_name: chuchu
+  last_name: chen
+  home: 泰兴

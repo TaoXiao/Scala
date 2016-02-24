@@ -19,3 +19,8 @@ dependencies {
             'org.yaml:snakeyaml:1.13'
 
 }
+
+task runReadYaml(type: JavaExec, dependsOn: 'classes') {
+    main = 'cn.gridx.scala.lang.yaml.ReadYaml'
+    classpath = sourceSets.main.runtimeClasspath
+}
