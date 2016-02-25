@@ -25,6 +25,7 @@ class SpeedyConfig extends Serializable {
 object ReadYaml {
 
   def main(args: Array[String]): Unit = {
+    /*
     println("从text读取")
     val text: String = "name: Jack\nage: 29\ncity: NewYork"
     println(text)
@@ -37,10 +38,13 @@ object ReadYaml {
     var stream = getClass.getResourceAsStream("/sample.yaml")
     ReadFromFile(stream)
 
+    */
 
-    println("\n\n从resource文件读取,以HashMap的形式直接读取出来")
-    stream = getClass.getResourceAsStream("/sample.yaml")
+
+    // println("\n\n从resource文件读取,以HashMap的形式直接读取出来")
+    val stream = getClass.getResourceAsStream("/sample.yaml")
     ReadFromFile2(stream)
+
 
   }
 
