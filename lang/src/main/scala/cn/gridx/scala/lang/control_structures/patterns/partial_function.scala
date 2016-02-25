@@ -1,4 +1,4 @@
-package cn.gridx.scala.lang.patterns
+package cn.gridx.scala.lang.control_structures.patterns
 
 /**
   * Created by tao on 2/25/16.

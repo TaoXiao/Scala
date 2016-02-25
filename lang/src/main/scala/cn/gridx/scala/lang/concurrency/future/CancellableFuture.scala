@@ -1,4 +1,4 @@
-package cn.gridx.scala.lang.concurrency
+package cn.gridx.scala.lang.concurrency.future
 
 /**
  * Created by tao on 6/26/15.

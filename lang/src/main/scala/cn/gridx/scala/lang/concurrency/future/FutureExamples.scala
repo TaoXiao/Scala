@@ -1,5 +1,4 @@
-package cn.gridx.scala.lang.concurrency
-
+package cn.gridx.scala.lang.concurrency.future
 
 import java.io.{File, PrintWriter}
 import java.util.Timer
@@ -20,7 +19,7 @@ import scala.concurrent.duration._
  * to get access to a thread pool.
  */
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Failure, Success, Random}
+import scala.util.{Failure, Random, Success}
 
 
 /**

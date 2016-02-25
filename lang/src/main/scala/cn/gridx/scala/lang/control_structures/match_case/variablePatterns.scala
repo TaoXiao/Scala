@@ -3,7 +3,7 @@ package cn.gridx.scala.lang.control_structures.match_case
 /**
  * Created by tao on 11/22/15.
  */
-object Example {
+object variablePatterns {
     def main(args: Array[String]): Unit = {
         val x1 = "hello"
         val x2 = 100
