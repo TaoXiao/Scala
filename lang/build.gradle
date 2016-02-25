@@ -16,7 +16,8 @@ dependencies {
     compile 'org.apache.hbase:hbase-server:0.98.6-cdh5.3.5',
             'joda-time:joda-time:2.6',
             'org.json4s:json4s-jackson_2.10:3.2.11',
-            'org.yaml:snakeyaml:1.13'
+            'org.yaml:snakeyaml:1.13',
+            'org.scala-lang:scala-actors:2.10.4'
 
 }
 
