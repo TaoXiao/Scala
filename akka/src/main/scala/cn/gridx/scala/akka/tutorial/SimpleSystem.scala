@@ -22,7 +22,11 @@ object SimpleSystem {
   def main(args: Array[String]) {
     println("[main] 创建简单的Akka系统")
 
+    /** `ActorSystem` 是一个Akka container,包含在该context中创建的全部actors */
     val system = ActorSystem("Simple-Akka-System")
+
+    /** 使用`ActorSystem#actorOf`可以该container内创建新的actors
+      * `listener` 和 `master` 使我们创建的两个 top level actors */
     val listener = system.actorOf(Props[Listener], "listener")
     val master = system.actorOf(Props(new Master(listener)), "master")
 
@@ -46,7 +50,10 @@ object SimpleSystem {
         println(s"[master] 收到`Msg_Start`消息,将创建 $num 个workers")
         numWorkers = num
 
-        /** we create a round-robin router to make it easier to spread out the work evenly between the workers  */
+        /** we create a round-robin router to make it easier to spread out the work evenly between the workers
+          * 在`Master`中再创建actors,这些actors都要被`Master`管理
+          * 关于routing,参考 [http://doc.akka.io/docs/akka/2.0/scala/routing.html#routing-scala]
+          * */
         val workerRouter = context.actorOf(
           Props[Worker].withRouter(RoundRobinRouter(num)), "Worker-Router")
 
