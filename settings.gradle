@@ -1,4 +1,5 @@
 rootProject.name = 'Scala'
 include 'lang'
 include 'lib'
+include 'akka'
 

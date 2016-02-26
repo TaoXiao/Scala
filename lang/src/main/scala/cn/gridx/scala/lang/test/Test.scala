@@ -7,12 +7,10 @@ import java.util.Map.Entry
   * Created by tao on 2/23/16.
   */
 object Test extends App {
+  var a: Int     = _
+  var b: Float   = _
+  var c: Boolean = _
+  var d: String  = _
 
-  var A = new Array[Int](5)
-  for (i <- 0 until A.size)
-    A(i) = i*100
-  println(A.mkString(", "))
-
-  A = A.dropWhile(_ <= 100)
-  println(A.mkString(" -> "))
+  println(s"$a , $b, $c, $d")
 }
