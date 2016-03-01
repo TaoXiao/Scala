@@ -1,0 +1,13 @@
+group 'cn.gridx.scala'
+version '1.0-RELEASE'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile (group: 'io.spray',             name: 'spray-can_2.10',          version: sprayVersion)
+    compile (group: 'io.spray',             name: 'spray-routing_2.10',      version: sprayVersion)
+    compile (group: 'com.typesafe.akka',    name: 'akka-actor_2.10',         version: akkaVersion)
+}
+
