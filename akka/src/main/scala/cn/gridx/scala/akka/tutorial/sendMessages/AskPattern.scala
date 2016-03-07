@@ -55,7 +55,7 @@ object AskPattern {
     }
 
     println(s"[${new Date}] 我还在main中")
-    println(s"[${new Date}] 你们应该会先看到我,再看到各个actors返回的结果")
+    println(s"[${new Date}] 你们也许会先看到我,再看到各个actors返回的结果")
   }
 
   trait Msg
