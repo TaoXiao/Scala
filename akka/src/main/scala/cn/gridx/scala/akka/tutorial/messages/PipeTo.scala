@@ -1,4 +1,4 @@
-package cn.gridx.scala.akka.tutorial.sendMessages
+package cn.gridx.scala.akka.tutorial.messages
 
 import java.util.Date
 
