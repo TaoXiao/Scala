@@ -7,24 +7,14 @@ package cn.gridx.scala.lang.test
 object Test {
 
   def main(args: Array[String]): Unit = {
-    val A = new Array[Float](7)
-    A(0) = 0f
-    A(1) = 1f
-    A(2) = 1f
-    A(3) = 1f
-    A(4) = 4f
-    A(5) = 4f
-    A(6) = 6f
+    val A = new Array[Int](5)
+    for (i <- 0 until 5)
+      A(i) = i
 
-    A.slice(0, 7).foreach(println)
+    for (i <- 0 until A.size)
+      A(i) *= 100
 
-    /*
-    val ret = findNearest(A, 0, 14.5f)
-    if (ret.isDefined)
-      println(ret.get._1 + ", " + ret.get._2)
-    else
-      println("不存在")
-      */
+    A.foreach(println)
   }
 
   /**

@@ -11,9 +11,11 @@ object PartialFunctions {
     //f1('x')
   }
 
+  /*
   def f1 = {
     case x: String => println(s"String: $x ")
     case x: Float  => println(s"Float: $x")
     case _         => println("Unknown type and value")
   }
+  */
 }
