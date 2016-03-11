@@ -69,6 +69,18 @@ trait Car {
   def park = { end }
 }
 
+trait Sedan {
+  // self type can be structure
+  engine : {
+    def start: Unit
+    def end: Unit
+    // def fuel: FuelType.Value
+  } =>
+
+  def drive = { engine.start }
+  def park = { engine.end }
+}
+
 
 trait Bus {
   this: Engine with Driver => // trait可以要求多个dependencies (用`with`连接)
