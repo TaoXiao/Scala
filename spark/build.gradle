@@ -1,0 +1,34 @@
+plugins {
+    id 'java'
+    id 'scala'
+    id 'com.github.johnrengelman.shadow' version '1.2.3'
+}
+
+
+group 'cn.gridx.scala'
+version '1.0-RELEASE'
+
+
+sourceCompatibility = 1.7
+
+repositories {
+    mavenCentral()
+    maven {
+        url 'https://repository.cloudera.com/artifactory/cloudera-repos'
+    }
+}
+
+dependencies {
+    compile "com.datastax.spark:spark-cassandra-connector_2.10:1.5.0-M2",
+            "org.apache.spark:spark-core_2.10:1.5.0-cdh5.5.1"
+}
+
+shadowJar {
+    // 只把指定的依赖打入到fat jar中
+    dependencies {
+        include (dependency('com.google.guava:guava:16.0.1'))   // 这个依赖不一定是compile阶段的依赖
+        include (dependency('com.datastax.cassandra:cassandra-driver-core:2.2.0-rc3'))
+    }
+
+    relocate 'com.google', 'com.google.gridx'
+}
