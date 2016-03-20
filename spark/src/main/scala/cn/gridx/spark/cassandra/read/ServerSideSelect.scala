@@ -1,4 +1,4 @@
-package cn.gridx.scala.spark.cassandra.read
+package cn.gridx.spark.cassandra.read
 
 import com.datastax.spark.connector.rdd.CassandraTableScanRDD
 import org.apache.spark.{SparkContext, SparkConf}
