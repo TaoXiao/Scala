@@ -1,6 +1,4 @@
 rootProject.name = 'Scala'
-include 'lang'
-include 'akka'
-include 'spray'
-include 'spark'
+include 'lang', 'akka', 'spray', 'libs', 'spark'
+rootProject.name = 'scala'
 
