@@ -24,42 +24,44 @@ import Database.threadLocalSession
 
 
 object Basic extends App {
-    def DB    = "slick"
-    def TABLE = "Persons"
+    def HOST   = "ecs5:3306"
+    def DB     = "slick"
+    def TABLE  = "Persons"
+    def Driver = "com.mysql.jdbc.Driver"
+    def User   = "root"
+    def Passwd = "njzd2014"
+
+    // 首选定义表的名称及结构
+    object Persons extends Table[(Int, String, String, Int)](TABLE) {
+      def id      = column[Int]("ID", O.PrimaryKey)
+      def name    = column[String]("NAME")
+      def gender  = column[String]("GENDER")
+      def age     = column[Int]("AGE")
+
+      // Every table needs a * projection with the same type
+      // as the table's type parameter
+      def * = id ~ name ~ gender ~ age
+    }
 
     /************************************************
       * 创建表
       ***********************************************/
     println(s"正在数据库 ${DB} 中创建表 ${TABLE} ...")
 
-    // 定义表的名称及结构
-    object Persons extends Table[(Int, String, String, Int)](TABLE) {
-        def id      = column[Int]("ID", O.PrimaryKey)
-        def name    = column[String]("NAME")
-        def gender  = column[String]("GENDER")
-        def age     = column[Int]("AGE")
-
-        // Every table needs a * projection with the same type
-        // as the table's type parameter
-        def * = id ~ name ~ gender ~ age
-    }
-
     /**
      * 连接到MYSQL
      * 这个block内的代码都运行在同一个session内
      * */
-    Database.forURL(s"jdbc:mysql://localhost:3306/${DB}",
-        driver = "com.mysql.jdbc.Driver",  user = "root", password = "njzd2014")
-    .withSession {
+    Database
+      .forURL(s"jdbc:mysql://$HOST/$DB", driver = Driver, user = User, password = Passwd)
+      .withSession {
         /**
          * The session is never named explicitly. It is bound to the current thread
          * as the `threadLocalSession` we imported
          * */
-
-        // 创建表
-        Persons.ddl.drop
-
         // 删除表
+        Persons.ddl.drop
+        // 创建表
         Persons.ddl.create
 
         /************************************************
@@ -74,13 +76,13 @@ object Basic extends App {
         Persons.insertAll(
             (3, "Lucy",  "Female",  20),
             (4, "Grace", "Female",  30),
-            (5, "Pig",   "Unknown", 25))
+            (5, "Pig",   "Male",    40))
 
 
         /************************************************
           * 从表中查询全部数据
           ***********************************************/
-        println(s"\n正在从表 ${DB}:${TABLE} 中查询数据 ...")
+        println(s"\n正在从表 ${DB}:${TABLE} 中查询全部数据 ...")
 
         /** 这种方式会遍历表中的全部数据
           * 相当于  select * from Persons
@@ -96,6 +98,9 @@ object Basic extends App {
           * 对表进行条件查询
           * 相等的判断用操作符 ===
           * 不等的判断用操作符 =!=
+          *
+          * 进行条件查询时(在for循环中加入if判断条件),实际的条件过滤
+          * 是放在数据库端进行的,而不是全部取回来再进行条件过滤
           ***********************************************/
         println(s"\n正在查询 gender === 'Male' 的数据 ...")
         val res1 = for { p <- Persons if p.gender === "Male" }

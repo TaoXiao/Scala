@@ -1,4 +1,4 @@
-group 'cn.gridx.scala'
+group 'cn.gridx'
 version '1.0-RELEASE'
 
 repositories {
