@@ -28,7 +28,7 @@ object QueryPartialColumns {
     *
     *  相当于:  select id, name from Persons
     */
-  object Persons extends Table[(Int, String)](TABLE) {
+  object t_persons extends Table[(Int, String)](TABLE) {
     def id    = column[Int]("ID", O.PrimaryKey)
     def name  = column[String]("NAME")
 
@@ -44,7 +44,7 @@ object QueryPartialColumns {
     Database
       .forURL(s"jdbc:mysql://$HOST/$DB", driver = Driver, user = User, password = Passwd)
       .withSession {
-        Query(Persons) foreach {
+        Query(t_persons) foreach {
           case (id, name) => println(s"id = $id, name = $name")
         }
       }

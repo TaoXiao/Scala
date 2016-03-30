@@ -1,2 +1,3 @@
 rootProject.name = 'scala'
-include 'lang', 'akka', 'spray', 'slick'
+include 'lang', 'akka', 'spray', 'slick', 'aws'
+
