@@ -1,16 +1,22 @@
 package cn.gridx.scala.lang.json
 
+import java.lang.reflect.Type
 import java.util
 
-import com.google.gson.Gson
+import com.google.gson._
+
+import scala.util.parsing.json.JSONObject
+
 
 /**
   * Created by tao on 2/29/16.
   */
 object serialize {
   def main(args: Array[String]): Unit = {
-    Serialize_PrimaryTypes
-    Serialize_CustomTypes
+    // Serialize_PrimaryTypes
+    // Serialize_CustomTypes
+    // renameFileds
+    UseJsonSerializer
   }
 
 
@@ -70,4 +76,25 @@ object serialize {
                     children: Array[String]) {}
 
 
+  /**
+    * 为class生成JSON时,将它的filed进行重命名
+    * */
+  def renameFileds(): Unit = {
+    val gson = new Gson()
+
+    val st = new ST("Jack Tomcat", 300)
+    val tree = gson.toJson(st)
+
+    println(tree)
+  }
+
+  /***
+    * 在一个JSON中插入一个sub-json
+    */
+  def InsertSubJson(): Unit = {
+
+  }
+
+
 }
+
