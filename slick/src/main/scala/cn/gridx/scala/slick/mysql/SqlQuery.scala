@@ -18,12 +18,12 @@ object SqlQuery {
 
   def main(args: Array[String]): Unit = {
     implicit val getCustomerResult =
-      GetResult(r => Customer(r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<))
+      GetResult(r => Customer(r.<<, r.<<, r.<<, r.<<))
 
     val id = "0000021395"
 
     val list: List[Customer] = db withSession {
-      val q = sql"""select contract_id,attribute_id,attribute_value, UNIX_TIMESTAMP(start_date) start,CASE WHEN end_date IS NOT NULL THEN UNIX_TIMESTAMP(end_date) ELSE 0 END AS end from customerattribute where  contract_id = $id"""
+      val q = sql"""select __pk_customerattribute, contract_id,attribute_id, attribute_value from customerattribute where  contract_id = $id"""
       val ret = q.as[Customer]  // 需要一个implicit session  ->  import scala.slick.session.Database.threadLocalSession
       ret.list
     }
@@ -32,16 +32,8 @@ object SqlQuery {
   }
 }
 
-case class Customer(cusotmerPk: Int,
-                    uniqueId: String,
-                    contractId: String,
-                    meteraccountId: String,
-                    servicePointId: String,
-                    entityAId: String,
-                    entityBId: String,
-                    contractRoot: Int,
-                    billingCycleGroupId: String,
-                    timezone: String,
-                    startDate: Long,
-                    endDate: Long)
+case class Customer(__pk_customerattribute: Int,
+                    contract_id: String,
+                    attribute_id: Int,
+                    attribute_value: String)
 
