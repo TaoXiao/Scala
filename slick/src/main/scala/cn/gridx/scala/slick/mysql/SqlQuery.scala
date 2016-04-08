@@ -20,15 +20,15 @@ object SqlQuery {
     implicit val getCustomerResult =
       GetResult(r => Customer(r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<, r.<<))
 
-    val id = "6199444205"
+    val id = "0000021395"
 
-    val list = db withSession {
-      val q = sql"""select contract_id,attribute_id,attribute_value, UNIX_TIMESTAMP(start_date) start,CASE WHEN end_date IS NOT NULL THEN UNIX_TIMESTAMP(end_date) ELSE 0 END AS end from customerattribute where active_flag =1 and contract_id = $id"""
+    val list: List[Customer] = db withSession {
+      val q = sql"""select contract_id,attribute_id,attribute_value, UNIX_TIMESTAMP(start_date) start,CASE WHEN end_date IS NOT NULL THEN UNIX_TIMESTAMP(end_date) ELSE 0 END AS end from customerattribute where  contract_id = $id"""
       val ret = q.as[Customer]  // 需要一个implicit session  ->  import scala.slick.session.Database.threadLocalSession
       ret.list
     }
 
-    println(list)
+    println(list.mkString("[", ",", "]"))
   }
 }
 
