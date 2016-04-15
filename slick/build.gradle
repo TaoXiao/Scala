@@ -6,6 +6,7 @@ sourceCompatibility = 1.7
 repositories {
     mavenCentral()
     mavenLocal()
+
 }
 
 configurations {
@@ -17,17 +18,7 @@ dependencies {
     compile 'com.typesafe.slick:slick_2.10:1.0.1',
             'org.slf4j:slf4j-api:1.6.4',
             'mysql:mysql-connector-java:5.1.38'
-
 }
-
-/*
-task testRunMySQL(type: JavaExec, dependsOn: 'classes')  {
-    main = 'cn.gridx.scala.slick.mysql.QueryPartialColumns'
-    classpath = sourceSets.main.runtimeClasspath
-    classpath += configurations.testRun
-    println '开始测试运行 mysql'
-}
-*/
 
 task testRunPhoenix(type: JavaExec, dependsOn: 'classes') {
     main = 'cn.gridx.scala.slick.phoenix.Basics'
