@@ -7,7 +7,7 @@ import org.joda.time.DateTime
 /**
   * Created by tao on 12/21/15.
   */
-object times {
+object jodatimes {
   def main(args: Array[String]): Unit = {
     // compareDate
      long2Date
