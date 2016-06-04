@@ -1,5 +1,10 @@
 package cn.gridx.scala.lang.test
 
+import java.util
+import java.util.Date
+
+import org.joda.time.{DateTime, DateTimeZone}
+
 
 /**
   * Created by tao on 2/23/16.
@@ -7,14 +12,8 @@ package cn.gridx.scala.lang.test
 object Test {
 
   def main(args: Array[String]): Unit = {
-    val A = new Array[Int](5)
-    for (i <- 0 until 5)
-      A(i) = i
-
-    for (i <- 0 until A.size)
-      A(i) *= 100
-
-    A.foreach(println)
+    val x  = "1"
+    println(if (x.equals("1")) true else false)
   }
 
   /**
