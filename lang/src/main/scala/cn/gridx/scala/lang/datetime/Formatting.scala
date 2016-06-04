@@ -3,20 +3,27 @@ package cn.gridx.scala.lang.datetime
 import java.text.SimpleDateFormat
 import java.util.Date
 
+import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
+import org.joda.time.{DateTime, DateTimeZone}
+
 /**
   * Created by tao on 4/5/16.
   */
 object Formatting {
   def main(args: Array[String]): Unit = {
-    UtilDate
+    // DateTimeZone.setDefault(DateTimeZone.forID("America/Los_Angeles"))
+    val day: DateTime = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss").parseDateTime("2016-03-06 12:34:56")
+    println(day)
   }
 
   def UtilDate(): Unit = {
-    val dt = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-    val date = new Date()
-    val str = dt.format(date)
-    println(date)   // Tue Apr 05 20:28:05 CST 2016
-    println(str)    // 2016-04-05 20:28:05
+    /*
+    val formatter = new formatter("yyyy-MM-dd HH:mm:ss")
+    DateTimeZone.setDefault(DateTimeZone.forID("America/Los_Angeles"))
+    DateTime.parse("", formatter)
+    */
+    val day: DateTime = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss").parseDateTime("2016-03-06")
+    println(day)
   }
 
 
