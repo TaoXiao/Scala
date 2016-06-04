@@ -18,6 +18,14 @@ object basics {
                 println("I'm yet hit")
     }
 
+    val y = "你好"
+
+    y match {
+      // case "", "你好"    =>
+      case "hello" => println("找到了")
+      case _ => println("没找到")
+    }
+
   }
 
 }
