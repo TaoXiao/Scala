@@ -1,0 +1,29 @@
+status = info
+rootLogger = Console, RollingFile
+#rootLogger.level = info
+rootLogger.appenderRef.console.ref = Console
+rootLogger.appenderRef.rolling.ref = RollingFile
+
+appender.console.type = Console
+appender.console.name = Console
+appender.console.layout.type = PatternLayout
+appender.console.layout.pattern = %highlight{%-8p [%d{yyyy-MM-dd HH:mm:ss}] %C %L: %m%n}
+
+logger.console.name = Console
+logger.console.level = debug
+
+
+appender.rolling.type = RollingFile
+appender.rolling.name = RollingFile
+appender.rolling.fileName = mylogs/etl.log
+appender.rolling.filePattern = mylogs/etl-%d{yyyy-MM-dd}.log.%i
+appender.rolling.layout.type = PatternLayout
+appender.rolling.layout.pattern = %-8p [%d{yyyy-MM-dd HH:mm:ss}] %C %t %L: %m%n
+
+appender.rolling.policies.type = SizeBasedTriggeringPolicy
+appender.rolling.policies.size=5KB
+appender.rolling.strategy.type = DefaultRolloverStrategy
+appender.rolling.strategy.max = 500
+
+#appender.a.name = cn.gridx.log4j2.examples.additivity
+#appender.a.type = RollingFile

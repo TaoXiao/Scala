@@ -1,4 +1,5 @@
 rootProject.name = 'scala'
 include 'lang', 'akka', 'spray', 'slick', 'aws', 'spark-sql'
 include 'spark'
+include 'log4j2'
 

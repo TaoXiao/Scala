@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+    <Appenders>
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%highlight{%-8p [%d{yyyy-MM-dd HH:mm:ss}] %c %L: %m%n}"/>
+        </Console>
+        <RollingFile name="RollingFile_additivity" fileName="mylogs/additivity/log.out" filePattern="mylogs/additivity/log.out.%i">
+            <PatternLayout>
+                <pattern>%-8p [%d{yyyy-MM-dd HH:mm:ss}] %c %L: %m%n</pattern>
+            </PatternLayout>
+            <SizeBasedTriggeringPolicy size="1KB" />
+            <DefaultRolloverStrategy max="20"/>
+        </RollingFile>
+        <RollingFile name="RollingFile_system" fileName="mylogs/system/log.out" filePattern="mylogs/system/log.out.%i">
+            <PatternLayout>
+                <pattern>%-8p [%d{yyyy-MM-dd HH:mm:ss}] %c %L: %m%n</pattern>
+            </PatternLayout>
+            <SizeBasedTriggeringPolicy size="1KB" />
+            <DefaultRolloverStrategy max="20"/>
+        </RollingFile>
+    </Appenders>
+    <Loggers>
+        <!-- 将包"cn.gridx.log4j2.examples.additivity"下的程序产生的所有日志写入到RollingFile_additivity中 -->
+        <Logger name="cn.gridx.log4j2.examples.additivity" level="warn" additivity="false">
+            <AppenderRef ref="RollingFile_additivity"/>
+        </Logger>
+        <!-- 将其他的程序都写入到Console和RollingFile_system -->
+        <Root level="info">
+            <AppenderRef ref="Console"/>
+            <AppenderRef ref="RollingFile_system"/>
+        </Root>
+    </Loggers>
+</Configuration>
