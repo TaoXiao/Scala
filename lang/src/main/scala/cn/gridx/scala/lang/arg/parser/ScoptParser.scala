@@ -10,8 +10,13 @@ case class MyConfig(name: String = "Unknown Name", age: Int = -1, male: Boolean 
 
 object ScoptParser {
 
+
   def main(args: Array[String]): Unit = {
-    parser.parse(args, MyConfig()) match {
+    if (args.isEmpty)
+      println(parser.usage)
+
+    // 第一个参数不算
+    parser.parse(args.slice(1, args.size), MyConfig()) match {
       case Some(config) => println(s"\n输入的参数合法, 列出参数: \n\t$config\n" +
         s"home = $home\n")
       case _ => println(s"\n输入的参数非法\n")
@@ -28,7 +33,8 @@ object ScoptParser {
         (a, c) => c.copy(age = a)
       } text("你的年龄")
 
-      opt[String]('n', "name") action {
+      // 用required来要求该参数必须存在
+      opt[String]('n', "name") required() valueName("<name>") action {
         (n, c) => c.copy(name = n)
       } text("你的名字")
 
