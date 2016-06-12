@@ -17,5 +17,14 @@ dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.11'
     compile 'org.scala-lang:scala-library:2.10.4',
             'com.typesafe.akka:akka-actor_2.10:2.3.14',
-            'org.scala-lang:scala-actors:2.10.4'
+            'org.scala-lang:scala-actors:2.10.4',
+            'org.slf4j:slf4j-log4j12:1.7.21',
+            'org.apache.logging.log4j:log4j-api:2.5',
+            'org.apache.logging.log4j:log4j-core:2.5'
+}
+
+jar {
+    from configurations.runtime.collect {
+        it.isDirectory() ? it : zipTree(it)
+    }
 }
