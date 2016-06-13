@@ -82,7 +82,7 @@ object serialize {
   def renameFileds(): Unit = {
     val gson = new Gson()
 
-    val st = new ST("Jack Tomcat", 300)
+    val st = new ScalaST("Jack Tomcat", 300)
     val tree = gson.toJson(st)
 
     println(tree)

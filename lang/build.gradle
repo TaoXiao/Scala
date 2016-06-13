@@ -11,6 +11,19 @@ repositories {
     }
 }
 
+// 这样把Java的源代码目录也映射到Scala上，就可以同时编译Java与Scala的源代码。s
+sourceSets {
+    main {
+        scala {
+            srcDirs = ['src/main/scala', 'src/main/java']
+        }
+        java {
+            srcDirs = []
+        }
+    }
+}
+
+
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.11'
     compile 'org.apache.hbase:hbase-server:0.98.6-cdh5.3.5',
