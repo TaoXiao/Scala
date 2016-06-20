@@ -9,7 +9,7 @@ import scala.collection.mutable
   * Created by tao on 5/25/16.
   */
 object ReadMySQL {
-  def path = "data_1.txt"
+  def path = "data_2.txt"
   def main(args: Array[String]): Unit = {
     val url = "jdbc:mysql://10.100.34.151:3306/pge_prod?user=demo&password=RE3u6pc8ZYx1c"
     val conn = DriverManager.getConnection(url)
@@ -38,7 +38,6 @@ object ReadMySQL {
     while (rs.next()) {
       val key = rs.getString("contract_id") + ":" + rs.getString("servicepoint_id")
 
-      // 只导出非空的字段
       val options = mutable.HashSet[String]()
       if (!rs.getString("da").isEmpty)  options.add(s"""opt:da:${rs.getString("da")}""")
       else  options.add(s"""opt:da:N""")
@@ -56,10 +55,19 @@ object ReadMySQL {
       else  options.add(s"""opt:fera:N""")
 
       if (!rs.getString("sr").isEmpty)    options.add(s"""opt:sr:${rs.getString("sr")}""")
+      else  options.add(s"""opt:sr:N""")
+
       if (!rs.getString("sc").isEmpty)    options.add(s"""opt:sc:${rs.getString("sc")}""")
+      else  options.add(s"""opt:sc:N""")
+
       if (!rs.getString("mb").isEmpty)    options.add(s"""opt:mb:${rs.getString("mb")}""")
+      else  options.add(s"""opt:mb:N""")
+
       if (!rs.getString("ee").isEmpty)    options.add(s"""opt:ee:${rs.getString("ee")}""")
+      else  options.add(s"""opt:ee:N""")
+
       if (!rs.getString("nems").isEmpty)  options.add(s"""opt:nems:${rs.getString("nems")}""")
+      else  options.add(s"""opt:nems:N""")
 
       val dims = mutable.HashSet[String]()
       if (!rs.getString("ratecompared1").isEmpty && !rs.getString("ratecompared1_amt").isEmpty)
@@ -68,7 +76,6 @@ object ReadMySQL {
         dims.add(s"""dim:${rs.getString("ratecompared2")}:${rs.getString("ratecompared2_amt")}""")
       if (!rs.getString("ratecompared3").isEmpty && !rs.getString("ratecompared3_amt").isEmpty)
         dims.add(s"""dim:${rs.getString("ratecompared3")}:${rs.getString("ratecompared3_amt")}""")
-
 
 
       writer.println(s"""$key,${options.mkString(",")},${dims.mkString(",")}""")
