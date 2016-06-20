@@ -11,7 +11,7 @@ import scala.util.parsing.json.JSONObject
 /**
   * Created by tao on 2/29/16.
   */
-object serialize {
+object Serialize2Json {
   def main(args: Array[String]): Unit = {
     // Serialize_PrimaryTypes
     // Serialize_CustomTypes
