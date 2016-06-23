@@ -1,7 +1,5 @@
 <<<<<<< HEAD
 *.iml
-gradlew
-gradlew.bat
 .gradle/
 gradle/
 .idea/
