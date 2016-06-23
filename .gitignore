@@ -1,7 +1,6 @@
 <<<<<<< HEAD
 *.iml
 .gradle/
-gradle/
 .idea/
 build/
 =======
