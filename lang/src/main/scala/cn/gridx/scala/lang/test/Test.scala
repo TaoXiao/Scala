@@ -6,6 +6,8 @@ import java.util.Date
 import com.google.gson.Gson
 import org.joda.time.{DateTime, DateTimeZone}
 
+import scala.collection.mutable.ArrayBuffer
+
 
 /**
   * Created by tao on 2/23/16.
@@ -886,15 +888,46 @@ object Test {
     """.stripMargin
 
   def main(args: Array[String]): Unit = {
+
+    val s = String.format(" %-70s 已创建", s""" "space:table" """)
+    val s1 = String.format(" %-70s 已创建", s""" "adasdasdasdasdaspace:dasdasdasfsfsfafdasdtable" """)
+    println(s)
+    println(s1)
+    /*
     val gson = new Gson()
     val obj: BusinessBrandList = gson.fromJson(json, classOf[BusinessBrandList])
     println(obj.businessBrandList.size)
 
     obj.businessBrandList.sortBy(_.name).foreach(t => println(t.name + " : " + t.id))
+    */
+
+
+
+    val list = ArrayBuffer[() => Unit]()
+    list.append(f1)
+    list.append(f2)
+    list.append(f3)
+
+    for (f <- list)
+      f()
   }
 
   def FromJson2Object(json: String): Unit ={
 
+  }
+
+
+
+  def f1(): Unit = {
+    println("I am f1")
+  }
+
+  def f2(): Unit = {
+    println("I am f2")
+  }
+
+  def f3(): Unit = {
+    println("I am f3")
   }
 
 
