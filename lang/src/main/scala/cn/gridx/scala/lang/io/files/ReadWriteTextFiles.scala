@@ -1,6 +1,6 @@
 package cn.gridx.scala.lang.io.files
 
-import java.io.{File, PrintWriter}
+import java.io.{File, FileWriter, PrintWriter}
 
 import scala.io.{BufferedSource, Source}
 
@@ -9,6 +9,10 @@ import scala.io.{BufferedSource, Source}
  */
 object ReadWriteTextFiles {
     def main(args: Array[String]): Unit = {
+
+        CreateFile("jg.txt")
+
+        /*
         val a = "\u0000"
         val b = "\u0001"
 
@@ -17,11 +21,11 @@ object ReadWriteTextFiles {
         if (b.equals("\u0001"))
             println("1")
 
-        return
-
         //writeTextFile("/Users/tao/IdeaProjects/Scala/Examples/target/hello.txt")
 
         //readLinesFromFile("/Users/tao/IdeaProjects/Scala/Examples/pom.xml")
+
+        */
     }
 
     /**
@@ -65,6 +69,13 @@ object ReadWriteTextFiles {
         val contents: String = src.mkString
 
         println(contents)
+    }
+
+    def CreateFile(path: String): Unit = {
+        val file = new File(path)
+        val writer = new PrintWriter(new FileWriter(file, true))
+        writer.append("\nhello")
+        writer.close()
     }
 }
 
