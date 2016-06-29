@@ -7,6 +7,7 @@ import java.sql.DriverManager
   */
 object PagedMySQL  {
   def main(args: Array[String]): Unit = {
+    /*
     val url = "jdbc:mysql://rdsu41uutacn4ssbirh9public.mysql.rds.aliyuncs.com:3306/lims_four_pro?zeroDateTimeBehavior=convertToNull"
     val user = "bigdata"
     val passwd = "bigdata_kc11730"
@@ -16,21 +17,26 @@ object PagedMySQL  {
     var rs = conn.prepareStatement(sql).executeQuery()
     rs.next()
     val total = rs.getInt(1)  // 表中总共有多少条数据?
+    */
 
-    val batchSize = 10000 // 希望以此查询得到
+    val total = 3001
+    val batchSize = 1000 // 希望一次查询查询出的数据量
     val loops = total / batchSize
 
     val remaining = total % batchSize
     var pos = 0
+    var i = 0
 
-    for (i <- 0 until loops) {
-      sql = s""" select * from $table limit ${i*batchSize}, $batchSize """
-      println(sql)
-    }
+    do {
+      val limit_start = i*batchSize
+      val limit_size =
+        if (0 == loops) remaining
+        else if (i == loops-1) batchSize + remaining
+        else batchSize
+      println(s""" LIMIT $limit_start, $limit_size""")
+      i += 1
+    } while (i < loops)
 
-    if (remaining > 0) {
-      val sql = s" select * from $table limit ${loops*batchSize}, $remaining"
-    }
 
   }
 }
