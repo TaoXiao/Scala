@@ -888,12 +888,15 @@ object Test {
     """.stripMargin
 
   def main(args: Array[String]): Unit = {
+   //  val x: Long = null
 
+
+    /*
     val s = String.format(" %-70s 已创建", s""" "space:table" """)
     val s1 = String.format(" %-70s 已创建", s""" "adasdasdasdasdaspace:dasdasdasfsfsfafdasdtable" """)
     println(s)
     println(s1)
-    /*
+
     val gson = new Gson()
     val obj: BusinessBrandList = gson.fromJson(json, classOf[BusinessBrandList])
     println(obj.businessBrandList.size)
@@ -902,7 +905,7 @@ object Test {
     */
 
 
-
+/*
     val list = ArrayBuffer[() => Unit]()
     list.append(f1)
     list.append(f2)
@@ -910,6 +913,7 @@ object Test {
 
     for (f <- list)
       f()
+      */
   }
 
   def FromJson2Object(json: String): Unit ={
