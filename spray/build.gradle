@@ -9,5 +9,8 @@ dependencies {
     compile (group: 'io.spray',             name: 'spray-can_2.10',          version: sprayVersion)
     compile (group: 'io.spray',             name: 'spray-routing_2.10',      version: sprayVersion)
     compile (group: 'com.typesafe.akka',    name: 'akka-actor_2.10',         version: akkaVersion)
+
+    compile 'net.debasishg:redisclient_2.10:3.0',
+            'org.apache.commons:commons-pool2:2.4.2'
 }
 
