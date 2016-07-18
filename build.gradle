@@ -23,7 +23,8 @@ subprojects {
 
     dependencies {
         //testCompile group: 'junit', name: 'junit', version: '4.11'
-        compile 'org.scala-lang:scala-library:2.10.4'
+        compile 'org.scala-lang:scala-library:2.10.4',
+                'org.scalaj:scalaj-http_2.10:2.3.0'
     }
 
     repositories {
