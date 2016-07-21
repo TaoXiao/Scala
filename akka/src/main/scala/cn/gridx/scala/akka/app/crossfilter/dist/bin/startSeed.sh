@@ -11,7 +11,7 @@ Class="cn.gridx.scala.akka.app.crossfilter.Worker"
 Lib="lib/*"
 Log4j2Conf="conf/log4j2"
 WorkerConf="conf/worker"
-JvmConf="-Xms6000m -Xmx6000m"
+JvmOpt="-Xms5000m -Xmx5000m"
 ActorType="seed"
 
-java $JvmConf -cp $Target:$Lib:$Log4j2Conf:$WorkerConf $Class --actorType $ActorType
+java $JvmOpt -cp $Target:$Lib:$Log4j2Conf:$WorkerConf $Class --actorType $ActorType

@@ -1,8 +1,8 @@
 package cn.gridx.scala.akka.app.crossfilter
 
+import org.slf4j.LoggerFactory
 
-import java.util
-
+import scala.collection.immutable.TreeMap
 import scala.collection.mutable
 import scala.io.Source
 
@@ -11,6 +11,7 @@ import scala.io.Source
   * Created by tao on 6/12/16.
   */
 class CrossFilter {
+  val logger = LoggerFactory.getLogger(this.getClass())
   private var source: Array[Record] = _
 
 
@@ -39,12 +40,12 @@ class CrossFilter {
 
   /**
     *
-    * 本方法假定, 由若干个options,
+    * 本方法假定, 存在若干个options,
     * 当options条件改变时, 计算唯一的dimension在指定统计区间上的分布
     *
     * @param optFilter - 针对option的filter条件
     * @param dimFilter - 针对dim的filter条件
-    * @param targetDimIntervals - 目标维度数据在预置的区间中是怎样分布的, dimIntervals中每一个维度的intervals都是一个有序数组(从小到大)
+    * @param targetDimensions - 目标维度数据在预置的区间中是怎样分布的, dimIntervals中每一个维度的intervals都是一个有序数组(从小到大)
     *                       对于每一个目标维度的interval:
     *                          在数轴上的形式为  a____b____c____d____e____f____g
     *                          即, 我们要求出, 目标维度上有多少个样本值小于a, 多少个在[a, b)之间,
@@ -59,50 +60,51 @@ class CrossFilter {
     *
     * */
   def doFiltering(optFilter: mutable.HashMap[String, String],
-                  dimFilter: mutable.HashMap[String, mutable.HashMap[String, Float]],
+                  dimFilter: mutable.HashMap[String, mutable.HashMap[String, Double]],
                   targetOptions: Array[String],
-                  targetDimIntervals: mutable.HashMap[String, Array[Float]]) // 可以是部分的dimension
-  : (util.HashMap[String, util.TreeMap[Int, Int]],
-    util.HashMap[String, util.HashMap[String, Int]])= {
-
+                  targetDimensions: mutable.HashMap[String, Array[Double]])
+  : (mutable.HashMap[String, TreeMap[Int, Int]], mutable.HashMap[String, mutable.HashMap[String, Int]]) // 可以是部分的dimension
+  = {
     // 最后要返回的结果
-    val dimDistributions = new util.HashMap[String, util.TreeMap[Int, Int]]()
-    for (dimName <- targetDimIntervals.keySet) {
-      val distri = new util.TreeMap[Int, Int]()
-      for (i <- 0 until targetDimIntervals.get(dimName).get.size + 1)
-        distri.put(i - 1, 0)
+    val dimDistributions = new mutable.HashMap[String, TreeMap[Int, Int]]()
+    for (dimName <- targetDimensions.keySet) {
+      var distri = TreeMap[Int, Int]()
+      for (i <- 0 until targetDimensions.get(dimName).get.size + 1)
+        distri += ((i - 1) -> 0)
       dimDistributions.put(dimName, distri)
     }
 
-    val optDistributions = new util.HashMap[String, util.HashMap[String, Int]]()
+    val optDistributions = new mutable.HashMap[String, mutable.HashMap[String, Int]]()
     for (optName <- targetOptions) {
-      optDistributions.put(optName, new util.HashMap[String, Int]())
+      optDistributions.put(optName, mutable.HashMap[String, Int]())
     }
 
-
     // 针对每一条数据进行分析
-    for (record <- source)
-      if (satisfyOpts(record.opts, optFilter) && satisfyDims(record.dims, dimFilter) ) {
-        // 计算每一个options的每一个value的分布
-        for ((optName, optValue) <- record.opts if targetOptions.contains(optName)) {
-          val optDistri = optDistributions.get(optName)
-          if (!optDistri.containsKey(optValue))
-            optDistri.put(optValue, 1)
-          else
-            optDistri.put(optValue, optDistri.get(optValue) + 1)
-        }
-
-        // 计算每一个维度上每一个interval的分布
-        for ((dimName, dimValue) <- record.dims if targetDimIntervals.contains(dimName)) {
-          val interval = targetDimIntervals.get(dimName).get
-          val pos = calcDistribution(dimValue, interval)
-          val dimDistri = dimDistributions.get(dimName)
-          if (!dimDistri.containsKey(pos))
-            dimDistri.put(pos, 1)
-          else
-            dimDistri.put(pos, dimDistri.get(pos) + 1)
-        }
+    for (record <- source if satisfyOpts(record.opts, optFilter) && satisfyDims(record.dims, dimFilter) ) {
+      // 计算每一个options的每一个value的分布
+      for ((optName, optValue) <- record.opts if targetOptions.contains(optName)) {
+        val optDistri = optDistributions.get(optName).get
+        if (!optDistri.contains(optValue))
+          optDistri.put(optValue, 1)
+        else
+          optDistri.put(optValue, optDistri.get(optValue).get + 1)
       }
+
+      // 计算每一个维度上每一个interval的分布
+      for ((dimName, dimValue) <- record.dims if targetDimensions.contains(dimName)) {
+        val interval: Array[Double] = targetDimensions.get(dimName).get
+        val pos = calcDistribution(dimValue, interval)
+        var dimDistri: TreeMap[Int, Int] = dimDistributions.get(dimName).get
+        if (!dimDistri.contains(pos))
+          dimDistri += (pos -> 1)
+        else {
+          val newValue = dimDistri.get(pos).get + 1
+          dimDistri -= pos
+          dimDistri += (pos -> newValue)
+        }
+        dimDistributions.put(dimName, dimDistri)
+      }
+    }
 
     (dimDistributions, optDistributions)
   }
@@ -112,9 +114,9 @@ class CrossFilter {
     * 判定实际的options是否满足给定的条件
     * 如果optFilter中不含某个optionName, 则表示在realOptions中对这个option没有任何要求
     *
-    * 对于optFilter中的每一个option, 要求 1) realOptions含有该option name  2) realOptions中该option的value满足条件
+    * 对于optFilter中的每一个option, 要求 a).realOptions含有该option name ; b).realOptions中该option的value满足条件
     * */
-  def satisfyOpts(realOptions: mutable.HashMap[String, String], optFilter: mutable.HashMap[String, String]): Boolean = {
+  private def satisfyOpts(realOptions: mutable.HashMap[String, String], optFilter: mutable.HashMap[String, String]): Boolean = {
     if (null == optFilter || optFilter.isEmpty)
       return true
 
@@ -132,7 +134,7 @@ class CrossFilter {
     * 判定实际的dims是否满足给定的条件
     *
     * */
-  def satisfyDims(realDims: mutable.HashMap[String, Float], dimFilter: mutable.HashMap[String, mutable.HashMap[String, Float]]): Boolean = {
+  def satisfyDims(realDims: mutable.HashMap[String, Double], dimFilter: mutable.HashMap[String, mutable.HashMap[String, Double]]): Boolean = {
     if (null == dimFilter || dimFilter.isEmpty)
       return true
 
@@ -141,7 +143,7 @@ class CrossFilter {
       val min = v.get("min").get
       val max = v.get("max").get
 
-      if (realDims.contains(dimName) && (realDims.get(dimName).get < min || realDims.get(dimName).get > max))
+      if (realDims.contains(dimName) && (realDims.get(dimName).get < min || realDims.get(dimName).get >= max))
         return false
     }
 
@@ -162,7 +164,7 @@ class CrossFilter {
     *        如果 c <= x < d, 则返回2
     *        如果 x >= g, 则返回 6
     * */
-  def calcDistribution(x: Float, interval: Array[Float]): Int = {
+  def calcDistribution(x: Double, interval: Array[Double]): Int = {
     if (x < interval(0))
       return -1
 
@@ -175,17 +177,16 @@ class CrossFilter {
     }
 
     throw new RuntimeException("错误的返回值")
-    return -2 // 绝不应该出现
   }
 
 
   /**
     * process one line from source data file
     * */
-  def ProcessOneLine(line: String): Record = {
+  private def ProcessOneLine(line: String): Record = {
     var key = "unknown"
     val optMap = mutable.HashMap[String, String]()
-    val dimMap = mutable.HashMap[String, Float]()
+    val dimMap = mutable.HashMap[String, Double]()
 
     for (token <- line.split(",")) {
       if (token.startsWith("opt"))
@@ -205,7 +206,7 @@ class CrossFilter {
     * @param s - like the form : "opt:opt_name:opt_value"
     *
     * */
-  def ParseOpt(s: String, optMap: mutable.HashMap[String, String]) = {
+  private def ParseOpt(s: String, optMap: mutable.HashMap[String, String]) = {
     val parts = s.split(":", 3)
     optMap.put(parts(1), parts(2))
   }
@@ -217,14 +218,14 @@ class CrossFilter {
     * @param s - like the form of "dim:dim_name:dim_value"
     *
     * */
-  def ParseDim(s: String, dimMap: mutable.HashMap[String, Float]) = {
+  private def ParseDim(s: String, dimMap: mutable.HashMap[String, Double]) = {
     val parts = s.split(":", 3)
-    dimMap.put(parts(1), parts(2).toFloat)
+    dimMap.put(parts(1), parts(2).toDouble)
   }
 
 }
 
-case class Record(key: String, opts: mutable.HashMap[String, String], dims: mutable.HashMap[String, Float])
+case class Record(key: String, opts: mutable.HashMap[String, String], dims: mutable.HashMap[String, Double])
 
 
 
@@ -244,12 +245,12 @@ object CrossFilter {
     optFilter.put("fera", "Y")
 
     // dimension的限制条件
-    val dimFilter = mutable.HashMap[String, mutable.HashMap[String, Float]]()
-    dimFilter.put("E1", mutable.HashMap[String, Float]("min" -> 300f, "max" -> 900f))
+    val dimFilter = mutable.HashMap[String, mutable.HashMap[String, Double]]()
+    dimFilter.put("E1", mutable.HashMap[String, Double]("min" -> 300f, "max" -> 900f))
 
     // 目标dimension的阈值区间
-    val dimIntervals = mutable.HashMap[String, Array[Float]]()
-    val interval_E1 = new Array[Float](10)
+    val dimIntervals = mutable.HashMap[String, Array[Double]]()
+    val interval_E1 = new Array[Double](10)
     for (i <- 0 until 10)
       interval_E1(i) = 150 * i
     dimIntervals.put("E1", interval_E1)

@@ -1,18 +1,15 @@
 package cn.gridx.scala.akka.app.crossfilter
 
-import java.util
-
-
 import scala.concurrent.duration._
-import akka.actor.{Actor, ActorPath, ActorRef, ActorSelection, ActorSystem, Props, RootActorPath}
-import akka.cluster.ClusterEvent.MemberUp
-import akka.cluster.{Cluster, Member}
+import akka.actor.{Actor, ActorPath, ActorRef, ActorSystem, Address, Props, RootActorPath}
+import akka.cluster.ClusterEvent.{MemberUp, UnreachableMember}
+import akka.cluster.{Cluster, ClusterEvent, Member}
 import akka.util.Timeout
 import com.typesafe.config.ConfigFactory
 import org.slf4j.LoggerFactory
 import scopt.OptionParser
-
 import scala.collection.mutable
+import scala.concurrent.{Await, Future}
 
 
 /**
@@ -21,70 +18,76 @@ import scala.collection.mutable
 class Worker extends Actor {
   val logger = LoggerFactory.getLogger(this.getClass)
   val cluster = Cluster(context.system)
-  var master: ActorSelection = _
-  var masterRef: ActorRef = _
+  var master: ActorRef = _
   val handler = new CrossFilter()
 
-  logger.info("正在启动worker ...\n")
-
-  lookupMaster()
-
-  logger.info("worker已启动\n")
 
   /**
-    * 订阅系统的[MemberUp]消息
+    * 订阅系统的消息
     * */
   override def preStart(): Unit = {
-    cluster.subscribe(self, classOf[MemberUp])
+    cluster.subscribe(self, ClusterEvent.initialStateAsEvents, classOf[MemberUp], classOf[UnreachableMember])
   }
 
-  override def receive = {
-    /*case MemberUp(member) =>
-      logger.info(s"收到了消息[MemberUp], member = ${RootActorPath(member.address)}\n")
-      registerSelf(member)*/
+  override def postStop(): Unit = {
+    cluster.unsubscribe(self)
+  }
 
-    case MSG_MASTER_LOAD(path, start, range) =>
-      loadData(path, start, range)
 
-    case MSG_MASTER_ANALYSIS(optFilter, dimFilter, targetOptions, dimIntervals) =>
+  override def receive: Receive = {
+    case MemberUp(member) =>
+      onMemberUp(member)
+
+    case MSG_MW_STARTLOAD(path, start, range) =>
+      import scala.concurrent.ExecutionContext.Implicits.global
+      Future{ loadData(path, start, range) }
+      logger.info("数据加载正在进行中 ...")
+
+    case MSG_MW_STARTANALYSIS(optFilter, dimFilter, targetOptions, dimIntervals) =>
       analyze(optFilter, dimFilter, targetOptions, dimIntervals)
   }
 
 
-  private def lookupMaster(): Unit = {
-    import scala.concurrent.ExecutionContext.Implicits.global
+  // 寻找master, 并向master注册自己
+  private def lookupMaster(address: Address): Unit = {
+    // import scala.concurrent.ExecutionContext.Implicits.global
     implicit val timeout = Timeout(10 seconds)
 
-    context.actorSelection("akka://CrossFilterSystem/user/master")
-      .resolveOne().onComplete {
-      case scala.util.Success(actorRef) =>
-        masterRef = actorRef.asInstanceOf[ActorRef]
-        logger.info(s"找到了master: ${masterRef.path}")
-      case scala.util.Failure(ex) =>
-        logger.info(s"未能找到master, 异常为 ${ex.toString}")
-    }
+    val f: Future[ActorRef] = context.system.actorSelection(RootActorPath(address)/"user"/"master").resolveOne()
+    master = Await.result(f, timeout.duration)
+    logger.info("找到了Master: " + master.path.toString)
+
+    registerSelf()
   }
 
 
   /**
-    * 收到MASTER启动的消息后, 记录下MASTER, 并向它汇报自己
+    * 收到master启动的消息后, 记录下master, 并向它汇报自己
     * */
-  def registerSelf(member: Member): Unit = {
-    if (member.hasRole("MASTER")) {
-      logger.info(s"将向master注册自己, member = $member")
-      master = context.actorSelection(RootActorPath(member.address)/"user"/"master")
+  private def registerSelf(): Unit = {
+      logger.info(s"worker将向master(${master.toString()})注册自己\n")
       master ! MSG_WM_REGISTER
-    }
   }
 
+
+  private def onMemberUp(member: Member): Unit = {
+    logger.info(s"消息[MemberUp], member = ${RootActorPath(member.address)}")
+
+    // 如果是maste, 则要找到并记住这个master
+    if (member.hasRole("MASTER"))
+      lookupMaster(member.address)
+  }
 
   /**
     * 每个worker加载自己的数据
     * */
-  def loadData(path: String, start: Int, range: Int): Unit = {
+  private def loadData(path: String, start: Int, range: Int): Unit = {
+    logger.info(s"收到了加载数据的指令")
     val ts = System.currentTimeMillis()
     handler.LoadSourceData(path, start, range)
-    sender ! MSG_WM_LOADFINISH(System.currentTimeMillis() - ts)
+    val elapsed = System.currentTimeMillis() - ts
+    logger.info(s"数据加载完成 - 耗时 ${elapsed/1000}秒")
+    master ! MSG_WM_LOAD_FINISHED(elapsed)
   }
 
 
@@ -92,26 +95,26 @@ class Worker extends Actor {
   /**
     * 每个worker开始分析自己持有的数据
     * */
-  def analyze(optFilter: scala.collection.mutable.HashMap[String, String],
-              dimFilter: mutable.HashMap[String, mutable.HashMap[String, Float]],
+  private def analyze(optFilter: scala.collection.mutable.HashMap[String, String],
+              dimFilter: mutable.HashMap[String, mutable.HashMap[String, Double]],
               targetOptions: Array[String],
-              dimIntervals: mutable.HashMap[String, Array[Float]]): Unit = {
-    println(s"${self.path} 开始分析自己的数据了")
+              dimIntervals: mutable.HashMap[String, Array[Double]]): Unit = {
+    logger.info(s"${self.path} 开始分析数据")
     val ts = System.currentTimeMillis()
     val (dimDistribution, optDistributions) = handler.doFiltering(optFilter, dimFilter, targetOptions, dimIntervals)
-    println(s"${self.path} 分析数据完成")
+
+    logger.info(s"${self.path} 数据分析完成, 结果为: \ndimDistribution = $dimDistribution\noptDistributions = $optDistributions\n")
     val elapsed = System.currentTimeMillis() - ts
 
-    master ! MSG_WM_ANALYSISFINISH(self.path, elapsed, dimDistribution, optDistributions)
+    master ! MSG_WM_ANALYSIS_FINISHED(self.path, elapsed, AnalysisResult(dimDistribution, optDistributions))
   }
 }
 
-case class Params(actorType: String = "unknown", actorNumber: Int = -1)
 
 
 object Worker {
-  val parser: OptionParser[Params] =
-    new scopt.OptionParser[Params]("输入节点类型, 以及节点数量 ") {
+  val parser: OptionParser[CmdParams] =
+    new scopt.OptionParser[CmdParams]("输入节点类型, 以及节点数量 ") {
       head("")
 
       opt[String]("actorType").required().valueName("<actor type>").action{
@@ -129,13 +132,13 @@ object Worker {
     * 与普通的worker不同之处在于: seed的端口是2551
     * */
   def main(args: Array[String]): Unit = {
-    parser.parse(args, Params()) match {
+    parser.parse(args, CmdParams()) match {
       case Some(params) =>
         if (params.actorType.equals("seed"))
           startSeedActors()
         else if (params.actorType.equals("nonSeed")) {
           for (i <- 0 until params.actorNumber)
-            createWorkerActor(port = "0", actorName = s"Worker_$i")
+            createWorkerActor(port = 0, actorName = s"Worker_$i")
         } else
           throw new RuntimeException("非法的`actorType`参数")
       case _ =>
@@ -151,7 +154,7 @@ object Worker {
     * 实际上这里的创建的seed actor自身也是一个worker actor
     */
   def startSeedActors(): Unit = {
-    val seedPorts = List[String]("2551")
+    val seedPorts = List[Int](2551)
     for (port <- seedPorts)
       createWorkerActor(port = port, actorName = s"Worker_$port")
   }
@@ -161,22 +164,11 @@ object Worker {
   /**
     * 创建普通的worker actor
     * */
-  def createWorkerActor(port: String, actorName: String): Unit = {
+  def createWorkerActor(port: Int = 0, actorName: String): Unit = {
     val config = ConfigFactory.parseString(s"akka.remote.netty.tcp.port=$port")
-      .withFallback(ConfigFactory.parseString("akk.cluster.roles=[WORKER]"))
+      .withFallback(ConfigFactory.parseString(s"akk.cluster.roles=[${Roles.MASTER}]"))
       .withFallback(ConfigFactory.load())
     val system = ActorSystem("CrossFilterSystem", config)
-    val worker: ActorRef = system.actorOf(Props[Worker], name = actorName)
+    system.actorOf(Props[Worker], name = actorName)
   }
 }
-
-
-case class MSG_WM_REGISTER()
-
-case class MSG_WM_LOADFINISH(elapsed: Long)
-
-case class MSG_WM_ANALYSISFINISH(actorPath: ActorPath, elapsed: Long,
-                                 dimDistribution: util.HashMap[String, util.TreeMap[Int, Int]],
-                                 optDistributions: util.HashMap[String, util.HashMap[String, Int]])
-
-

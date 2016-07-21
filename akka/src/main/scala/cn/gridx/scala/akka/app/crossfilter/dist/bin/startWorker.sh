@@ -10,9 +10,10 @@ Target="bin/akka-1.0-RELEASE-all.jar"
 Class="cn.gridx.scala.akka.app.crossfilter.Worker"
 Lib="lib/*"
 Log4j2Conf="conf/log4j2"
+JvmOpt="-Xms5000m -Xmx5000m"
 WorkerConf="conf/worker"
-JvmConf="-Xms6000m -Xmx6000m"
 ActorType="nonSeed"
-ActorNum="1"
+ActorNum="3"
 
-java $JvmConf -cp $Target:$Log4j2Conf:$WorkerConf:$Lib  $Class --actorType $ActorType --actorNumber $ActorNum
+
+java $JvmOpt -cp $Target:$Log4j2Conf:$WorkerConf:$Lib  $Class --actorType $ActorType --actorNumber $ActorNum

@@ -1,9 +1,7 @@
 package cn.gridx.scala.akka.app.crossfilter
 
 import java.io.File
-import java.util
 
-import akka.pattern.ask
 import akka.actor.{Actor, ActorPath, ActorRef, ActorSystem, Props, RootActorPath}
 import akka.util.Timeout
 import com.google.gson.{Gson, GsonBuilder}
@@ -12,9 +10,9 @@ import scala.concurrent.duration._
 import com.typesafe.config.{Config, ConfigFactory}
 import org.slf4j.LoggerFactory
 
-import scala.collection.mutable
+import scala.collection.immutable.TreeMap
+import scala.collection.{Set, mutable}
 import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.{Await, Future}
 import scala.io.Source
 
 /**
@@ -22,64 +20,84 @@ import scala.io.Source
   */
 class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
   val logger = LoggerFactory.getLogger(this.getClass)
-  logger.info("正在启动master\n")
 
   // 存储所有的worker actors
-  val workers = ArrayBuffer[ActorRef]()
-  var numLoadingFinished      = 0       //  多少个worker加载完成了
-  var numAnalysisFinished     = 0       //  多少个worker完成了对自己数据的分析
-  var loadingStarted          = false   //  是否已经开始load数据
-  var loadingFinished         = false   //  是否所有的worker已经加载完自己的数据了
-  var ts_startLoading : Long  = _
-  var ts_startAnalysis: Long  = _
-  var queryingActor: Option[ActorRef] = None
+  val workers = ArrayBuffer[ActorRef]()       //  将所有的worker actors存储在这里
+  var numLoadingFinished  : Int     = 0       //  多少个worker加载完成了
+  var numAnalysisFinished : Int     = 0       //  多少个worker完成了对自己数据的分析
+  var loadingStarted      : Boolean = false   //  是否已经开始load数据
+  var loadingFinished     : Boolean = false   //  是否所有的worker已经加载完自己的数据了
+  var ts_startLoading     : Long    = _       //  对加载数据开始计时
+  var ts_startAnalysis    : Long    = _       //  对每次的分析结果开始计时
+  var queryingActor: Option[ActorRef] = None  //  当前是否有某个spray发起了请求, 但是还未被处理完
 
   // 在一次查询中, 将每一个worker返回的结果记录在这里
-  val analysisResultSet: mutable.HashMap[ActorRef, AnalysisResult] = mutable.HashMap[ActorRef, AnalysisResult]()
-
-  logger.info(s"master已启动, path = ${self.path}\n")
+  val analysisResultSet: mutable.ArrayBuffer[AnalysisResult] = mutable.ArrayBuffer[AnalysisResult]()
 
   override def receive = {
-    case MSG_START_CALCULATION =>
-      if (queryingActor.isDefined) {
-        val msg = s"当前有请求还未被处理, 请稍后再试!"
-        logger.info(msg)
-        sender ! CalcResult(false, msg, null)
-      } else {
-        queryingActor = Some(sender())
-        val resp = onMsgStartCalculation()
-        // 如果当前无法开始分析, 则onMsgStartCalculation会立即返回一个包含错误信息的结果
-        // 我们需要直接将该结果返回给sender, 并将queryingActor重置为None
-        if (null != resp) {
-          queryingActor.get ! resp
-          queryingActor = None
-          logger.info("将把queryingActor重置为None")
-        }
-      }
+    // Spray -> Master : 开始分析数据
+    case MSG_SM_STARTCALC(analysisParam) =>
+      onMsgSmStartCalc(analysisParam)
 
-    // worker要求向master注册了自己
+    // Worker -> Master : 向master注册自己
     case MSG_WM_REGISTER =>
       onMsgWmRegister(sender())
 
-    // 某个worker加载完了自己的数据
-    case MSG_WM_LOADFINISH(elapsed) =>
+    // Worker -> Master : 某个worker完成了对自己数据子集的加载
+    case MSG_WM_LOAD_FINISHED(elapsed) =>
       onMsgWmLoadFinish(sender(), elapsed)
 
-    // worker计算完了自己的数据
-    case MSG_WM_ANALYSISFINISH(actorPath, elapsed, dimDistribution, optDistributions) =>
-      onMsgWmAnalysisFinish(actorPath, elapsed, dimDistribution, optDistributions)
+    // worker ->  worker计算完了自己的数据
+    case MSG_WM_ANALYSIS_FINISHED(actorPath, elapsed, analysisResult) =>
+      onMsgWmAnalysisFinished(actorPath, elapsed, analysisResult)
 
+    // spray -> master 测试消息
+    case WM_SM_TEST =>
+      logger.info("收到了消息 WM_SM_TEST")
+      sender() ! MSG_MS_TEST
   }
 
 
-  def onMsgStartCalculation(): CalcResult = {
-    logger.info("收到消息: MSG_START_CALCULATION\n")
+  /***
+    * 当Spray要求master开始分析数据
+    *
+    * @param analysisParam - spray传来的参数
+    */
+  def onMsgSmStartCalc(analysisParam: AnalysisParam): Unit = {
+    ts_startAnalysis = System.currentTimeMillis()
+    if (queryingActor.isDefined) {
+      val msg = s"当前有请求还未被处理完毕, 请稍后再试!"
+      logger.info(msg)
+      sender ! CalcResult(false, msg, null)
+    } else {
+      queryingActor = Some(sender())
+      val errorMsg = prepareAnalysis(analysisParam)
+      if (null != errorMsg) {
+        queryingActor.get ! CalcResult(false, errorMsg, null)
+        queryingActor = None
+        logger.info("将把queryingActor重置为None")
+      } else {
+        logger.info("正在指令各个worker开始分析自己的数据")
+        doAnalysis(analysisParam)
+      }
+    }
+  }
 
+
+  /**
+    * 为开始分析进行准备, 主要是检查:
+    *   1) 当前的workers数量是否足够
+    *   2) 数据加载是否完成
+    *
+    * 如果检查通过, 则返回null
+    * 否则, 返回一条错误消息
+    * */
+  def prepareAnalysis(analysisParam: AnalysisParam): String  = {
     // 首先检查workers的情况
     if (workers.size != maxWorkerNum) {
       val msg = s"无法开始计算! 目前的worker actor数量为${workers.size}, 还未到达预定的数量${maxWorkerNum}"
       logger.info(msg)
-      return CalcResult(false, msg, null)
+      return msg
     }
 
     // 再检查数完毕据是否已经加载
@@ -89,13 +107,9 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
         loadingStarted = true
       }
       val msg = s"数据加载尚未完成, 请稍后再试 !"
-      logger.info("msg")
-      return CalcResult(false, msg, null)
+      logger.info(msg)
+      return msg
     }
-
-    // 如果各个workers已经准备就绪, 且它们都已经加载完数据, 则可以开始计算
-    logger.info("正在指令各个worker开始分析自己的数据")
-    startAnalyze(constrcuctQuery())
 
     return null
   }
@@ -105,12 +119,14 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
     * 某个worker向master发送的消息, 要求向master注册自己
     * */
   private def onMsgWmRegister(worker: ActorRef): Unit = {
-    logger.info(s"收到了消息[MSG_WM_REGISTER], sender = ${worker.path}\n")
+    logger.info(s"消息[MSG_WM_REGISTER], sender = ${worker.path}")
 
-    if (workers.size < maxWorkerNum)
+    if (workers.size < maxWorkerNum) {
       workers.append(worker)
+      logger.info(s"已接受注册该worker, 现在有${workers.size}个worker在册")
+    }
     else
-      logger.info("注册workers的名额已满, 不再接受worker注册\n")
+      logger.info("注册workers的名额已满, 不再接受worker注册")
   }
 
 
@@ -122,14 +138,17 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
     logger.info("现在指令各个workers加载自己的数据 ... ")
     ts_startLoading = System.currentTimeMillis()
 
-    val assignments = assignData(dataPath, workers.size)
+    val assignments: mutable.HashMap[Int, (Int, Int)] = assignData(dataPath, workers.size)
     for (i <- 0 until workers.size) {
       val (start, range) = assignments.get(i).get
-      workers(i) ! MSG_MASTER_LOAD(dataPath, start, range)
+      workers(i) ! MSG_MW_STARTLOAD(dataPath, start, range)
     }
   }
 
 
+  /**
+    * 目标数据文件中有多少行
+    * */
   private def countLines(path: String): Int = {
     val lines = Source.fromFile(new File(path)).getLines()
     lines.size
@@ -149,24 +168,32 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
       val totalElapsed = System.currentTimeMillis() - ts_startLoading
       logger.info(s"全部workers完成了数据加载, 整体耗时 ${totalElapsed/1000} 秒")
     } else
-      logger.error(s"有异常: numLoadingFinished = $numLoadingFinished, workers.size = ${workers.size}")
+      logger.info(s"Actor($actor)加载完了自己的数据")
   }
+
+
 
 
   /**
     * 某个worker完成了对自己数据的分析
     * */
-  private def onMsgWmAnalysisFinish(actorPath: ActorPath, elapsed: Long,
-                            dimDistribution: util.HashMap[String, util.TreeMap[Int, Int]],
-                            optDistributions: util.HashMap[String, util.HashMap[String, Int]]): Unit = {
+  private def onMsgWmAnalysisFinished(actorPath: ActorPath, elapsed: Long, result: AnalysisResult): Unit = {
     logger.info(s"Worker[${RootActorPath(actorPath.address)}] 完成计算, 耗时 ${elapsed/1000} 秒, 计算结果为: \n" +
-      s"dimDistribution = $dimDistribution\noptDistributions = $optDistributions\n")
+      s"dimDistribution = ${result.dimDistributions}\noptDistributions = ${result.optDistributions}\n")
 
+    if (workers.size <= numAnalysisFinished) {
+      logger.error(s"异常: 不应该再收到来自worker($actorPath)的计算结果, 因为现在master已经有了来自${numAnalysisFinished}个worker的计算结果")
+      return
+    }
+
+    // 将这个worker的计算结果存储起来
+    analysisResultSet.append(result)
     numAnalysisFinished += 1
+
     if (numAnalysisFinished == workers.size) {
       val totalElapsed = System.currentTimeMillis() - ts_startAnalysis
       logger.info(s"全部的worker分析完成, 总体耗时 ${totalElapsed/1000} 秒\n")
-      forwardAnalysisResultsQueryingActor()
+      forwardAnalysisResult2QueryingActor(totalElapsed) // 把所有的结果融合起来, 然后将结果返回给spray actor
     }
   }
 
@@ -174,22 +201,97 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
   /**
     * 当所有的worker都完成了对自己数据的分析后, 每个worker会算出一个结果子集
     * 需要把所有worker的结果子集merge成最终的结果
+    *
+    * 例如: M1 = ({E6={-1=0, 0=0, 1=0, 2=0}, E1={-1=0, 0=0, 1=4, 2=5}}, {A={Y=27}, B={N=27}, C={N=27}, D={N=27}, E={Y=2, N=25}} )
+    *      M2 = ({E6={-1=0, 0=0, 1=0, 2=0}, E1={-1=0, 0=0, 1=4, 2=5}}, {A={Y=27}, B={N=27}, C={N=27}, D={N=27}, E={Y=2, N=25}} )
+    *      M3 = ({E6={-1=0, 0=0, 1=0, 2=0}, E1={-1=0, 0=0, 1=4, 2=5}}, {A={Y=27}, B={N=27}, C={N=27}, D={N=27}, E={Y=2, N=25}} )
+    *      M = ArrayBuffer(M1, M2, M3)
+    * 则   mergerAnalysisResults(M) =
+    *         Map(E1 -> Map(-1 -> 0, 0 -> 0, 1 -> 12, 2 -> 15), TOUA -> Map(-1 -> 30, 0 -> 27, 1 -> 24, 2 -> 21), E6 -> Map(-1 -> 0, 0 -> 0, 1 -> 0, 2 -> 0))
+              *Map(D -> Map(N -> 81), A -> Map(Y -> 81), C -> Map(N -> 81), E -> Map(Y -> 6, N -> 75), B -> Map(N -> 81))
     * */
-  private def mergerAnalysisResults(): CalcResult = {
-    val msg = s"结果子集融合完毕"
-    logger.info(msg)
-    return CalcResult(true, msg, null)
+  private def mergeAnalysisResults(analysisResults: mutable.ArrayBuffer[AnalysisResult]): AnalysisResult = {
+    val finalDimDistri = mutable.HashMap[String, TreeMap[Int, Int]]() // key - dimName,   value: dimDistri
+    val finalOptDistri = mutable.HashMap[String, mutable.HashMap[String, Int]]()
+
+    // originDimDistr = Array[Map[dimName, dimDistri]]
+    val originDimDistrArr: ArrayBuffer[mutable.HashMap[String, TreeMap[Int, Int]]] = analysisResults.map(_.dimDistributions)
+    for (originDimDistr <- originDimDistrArr) {
+      for ((name, distri) <- originDimDistr) {
+        if (!finalDimDistri.contains(name))
+          finalDimDistri.put(name, distri)
+        else
+          finalDimDistri.put(name, mergeDimDistri(distri, finalDimDistri.get(name).get))
+      }
+    }
+
+    val originOptDistriArr: ArrayBuffer[mutable.HashMap[String, mutable.HashMap[String, Int]]] = analysisResults.map(_.optDistributions)
+    for (originOptDistri <- originOptDistriArr) {
+      for ((name, distri) <- originOptDistri) {
+        if (!finalOptDistri.contains(name))
+          finalOptDistri.put(name, distri)
+        else
+          finalOptDistri.put(name, mergeOptDistri(distri, finalOptDistri.get(name).get))
+      }
+    }
+
+    AnalysisResult(finalDimDistri, finalOptDistri)
   }
 
 
-  private def forwardAnalysisResultsQueryingActor(): Unit = {
+  /**
+    * 将两个dimension distribution累加起来
+    *
+    * m1和m2中的key一定是相同的,这与`mergeOptDistri`方法面临的情况不同
+    * */
+  private def mergeDimDistri(m1: TreeMap[Int, Int], m2: TreeMap[Int, Int]): TreeMap[Int, Int] = {
+    var result = TreeMap[Int, Int]()
+
+    for (key <- m1.keys) {
+      val sum = m1.get(key).get + m2.get(key).get
+      result += (key -> sum)
+    }
+
+    result
+  }
+
+
+  /**
+    * 将两个option distribution累加起来
+    *
+    * m1和m2中的key有可能不同, 例如对于option "CARE"
+    *   m1 = Map("Y" -> 5), m2 = Map("N" -> 10)
+    * 这是因为, m1和m2如果来自于两个actor, 那么可能actor1中的数据的该属性的值全部为"Y", 而actor2中的数据的该属性的值全部为"N"
+    * 所以对于这种情况, 应该把它们合并起来, 形成Map("Y" -> 5, "N" -> 10)
+    * */
+  private def mergeOptDistri(m1: mutable.HashMap[String, Int], m2: mutable.HashMap[String, Int]): mutable.HashMap[String, Int] = {
+    val result = mutable.HashMap[String, Int]()
+    val totalKeys: Set[String] = m1.keySet union m2.keySet
+
+    for (key <- totalKeys) {
+      val sum = m1.getOrElse(key, 0) + m2.getOrElse(key, 0)
+      result.put(key, sum)
+    }
+
+    result
+  }
+
+
+
+  /**
+    * 汇总所有worker的计算结果, 然后将最终结果发送到spray
+    * */
+  private def forwardAnalysisResult2QueryingActor(elapsedMillis: Long): Unit = {
     if (queryingActor.isEmpty) {
-      logger.error("异常, queryingActor不应该为None\n")
+      logger.error("异常, QueryingActor不应该为None\n")
       return
     }
 
-    queryingActor.get ! mergerAnalysisResults()
+    // 向spray actor回送经过merge后的结果
+    queryingActor.get ! CalcResult(true, s"计算成功, 耗时${elapsedMillis/1000.0}秒", mergeAnalysisResults(analysisResultSet))
     queryingActor = None
+    analysisResultSet.clear()
+    numAnalysisFinished = 0
   }
 
 
@@ -221,112 +323,98 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
   /**
     * 指令各个workers分析自己的数据
     * */
-  private def startAnalyze(param: AnalysisParam): Unit = {
-    // options的限制条件
-    val optFilter =  mutable.HashMap[String, String]()
-    optFilter.put("care", "Y")
-    // optFilter.put("fera", "Y")
+  private def doAnalysis(param: AnalysisParam): Unit = {
+    logger.info(s"查询参数为 : \n$param")
 
-    // dimension的限制条件
-    val dimFilter = mutable.HashMap[String, mutable.HashMap[String, Float]]()
-    dimFilter.put("E1", mutable.HashMap[String, Float]("min" -> 100f, "max" -> 1400f))
-
-    // 目标dimension的阈值区间
-    val dimIntervals = mutable.HashMap[String, Array[Float]]()
-    val interval_E1 = new Array[Float](10)
-    for (i <- 0 until 10)
-      interval_E1(i) = 150 * i
-    dimIntervals.put("E1", interval_E1)
-
-    val interval_E6 = new Array[Float](10)
-    for (i <- 0 until 10)
-      interval_E6(i) = 150 * i
-    dimIntervals.put("E6", interval_E6)
-
-    // 目标options
-    val targetOptions = Array[String]("care", "mb", "da", "cca", "tbs")
     for (worker <- workers)
-      worker ! MSG_MASTER_ANALYSIS(optFilter, dimFilter, targetOptions, dimIntervals)
-  }
-
-
-  // 测试, 构造一个查询参数
-  private def constrcuctQuery(): AnalysisParam = {
-    // options的限制条件
-    val optFilter =  mutable.HashMap[String, String]()
-    optFilter.put("care", "Y")
-    // optFilter.put("fera", "Y")
-
-    // dimension的限制条件
-    val dimFilter = mutable.HashMap[String, mutable.HashMap[String, Float]]()
-    dimFilter.put("E1", mutable.HashMap[String, Float]("min" -> 100f, "max" -> 1400f))
-
-    // 目标dimension的阈值区间
-    val dimIntervals = mutable.HashMap[String, Array[Float]]()
-    val interval_E1 = new Array[Float](10)
-    for (i <- 0 until 10)
-      interval_E1(i) = 150 * i
-    dimIntervals.put("E1", interval_E1)
-
-    val interval_E6 = new Array[Float](10)
-    for (i <- 0 until 10)
-      interval_E6(i) = 150 * i
-    dimIntervals.put("E6", interval_E6)
-
-    // 目标options
-    val targetOptions = Array[String]("care", "mb", "da", "cca", "tbs")
-
-    AnalysisParam(optFilter, dimFilter, targetOptions, dimIntervals)
+      worker ! MSG_MW_STARTANALYSIS(param.optFilter, param.dimFilter, param.targetOptions, param.targetDimensions)
   }
 }
 
 
+
+
 object Master  {
+  case class CmdParam(dataPath: String = null, minWorkerActors: Int = -1)
+
+  val logger = LoggerFactory.getLogger(this.getClass())
+
+  val parser = new scopt.OptionParser[CmdParam]("请输入数据文件的路径, 以及要求的acror数量") {
+    head("")
+
+    opt[String]("dataPath") required() valueName("<data file path>") action {
+      (x, c) => c.copy(dataPath = x)
+    } text("数据文件的路径")
+
+    opt[Int]("minWorkerActors") required() valueName("<minimum worker actor number>") action {
+      (x, c) => c.copy(minWorkerActors = x)
+    } text("要求的worker actors数量的下限")
+  }
+
   val gson: Gson = new GsonBuilder().serializeNulls().create()
-  implicit val timeout: Timeout = Timeout(30 seconds)
+  implicit val timeout: Timeout = Timeout(60 second)
   var config: Config        = _
   var system: ActorSystem   = _
   var master: ActorRef      = _
 
-  def StartMaster(dataPath: String, maxWorkerNum: Int): Unit = {
-    config = ConfigFactory.parseString("akka.cluster.roles=[MASTER]")
+
+  def main(args: Array[String]): Unit = {
+    logger.info(s"args = ${args.mkString("[", "|", "]")}")
+
+    config = ConfigFactory.parseString(s"akka.cluster.roles=[${Roles.MASTER}]")
       .withFallback(ConfigFactory.load())
     system = ActorSystem("CrossFilterSystem", config)
-    master = system.actorOf(Props(classOf[Master], dataPath, 5), name = "master")
+
+    parser.parse(args, CmdParam()) match {
+      case Some(param) =>
+        master = system.actorOf(Props(classOf[Master], param.dataPath, param.minWorkerActors), name = "master")
+      case _ =>
+        logger.error("错误的输入参数!")
+        System.exit(1)
+    }
   }
 
 
   /**
-    * 当收到来自Spray的指令时, 本方法将被调用
-    * 本方法将
+    * 仅仅作测试用
+    * 验证 方法 `mergerAnalysisResults` 的计算正确性
     * */
-  def StartCalculation(): String = {
-    val future: Future[Any] = master ? MSG_START_CALCULATION
-    val resp: CalcResult = Await.result(future, timeout.duration).asInstanceOf[CalcResult]
-    gson.toJson(resp)
+  def Validate_mergerAnalysisResults(master: Master): Unit = {
+    val M1 = AnalysisResult(
+      mutable.HashMap("E6"    -> TreeMap(-1 -> 0, 0 -> 0, 1 -> 0, 2 -> 0),
+        "E1"    -> TreeMap(-1 -> 0, 0 -> 0, 1 -> 4, 2 -> 5),
+        "TOUA"  -> TreeMap(-1 -> 10, 0 -> 9, 1 -> 8, 2 -> 7)),
+      mutable.HashMap("A"   -> mutable.HashMap("Y" -> 27),
+        "B"   -> mutable.HashMap("N" -> 27),
+        "C"   -> mutable.HashMap("N" -> 27),
+        "D"   -> mutable.HashMap("N" -> 27),
+        "E"   -> mutable.HashMap("Y" -> 2, "N" -> 25))
+    )
+
+    val M2: AnalysisResult = AnalysisResult(
+      mutable.HashMap("E6" -> TreeMap(-1 -> 0, 0 -> 0, 1 -> 0, 2 -> 0),
+        "E1" -> TreeMap(-1 -> 0, 0 -> 0, 1 -> 4, 2 -> 5),
+        "TOUA" -> TreeMap(-1 -> 10, 0 -> 9, 1 -> 8, 2 -> 7)),
+      mutable.HashMap("A" -> mutable.HashMap("Y" -> 27),
+        "B" -> mutable.HashMap("N" -> 27),
+        "C" -> mutable.HashMap("N" -> 27),
+        "D" -> mutable.HashMap("N" -> 27),
+        "E" -> mutable.HashMap("Y" -> 2, "N" -> 25))
+    )
+
+
+    val M3: AnalysisResult = AnalysisResult(
+      mutable.HashMap("E6" -> TreeMap(-1 -> 0, 0 -> 0, 1 -> 0, 2 -> 0),
+        "E1" -> TreeMap(-1 -> 0, 0 -> 0, 1 -> 4, 2 -> 5),
+        "TOUA" -> TreeMap(-1 -> 10, 0 -> 9, 1 -> 8, 2 -> 7)),
+      mutable.HashMap("A" -> mutable.HashMap("Y" -> 27),
+        "B" -> mutable.HashMap("N" -> 27),
+        "C" -> mutable.HashMap("N" -> 27),
+        "D" -> mutable.HashMap("N" -> 27),
+        "E" -> mutable.HashMap("Y" -> 2, "N" -> 25))
+    )
+
+    println(master.mergeAnalysisResults(mutable.ArrayBuffer(M1, M2, M3)).dimDistributions)
+    println(master.mergeAnalysisResults(mutable.ArrayBuffer(M1, M2, M3)).optDistributions)
   }
-
 }
-
-case class MSG_START_CALCULATION()
-
-case class MSG_MASTER_LOAD(path: String, start: Int, range: Int)
-
-case class MSG_MASTER_ANALYSIS(optFilter: mutable.HashMap[String, String],
-                               dimFilter: mutable.HashMap[String, mutable.HashMap[String, Float]],
-                               targetOptions: Array[String],
-                               dimIntervals: mutable.HashMap[String, Array[Float]])
-
-// 每一个worker对于自己数据的计算结果
-case class AnalysisResult(dimDistributions: util.HashMap[String, util.TreeMap[Int, Int]],
-                          optDistributions: util.HashMap[String, util.HashMap[String, Int]])
-
-
-// 要求worker计算时的查询参数
-case class AnalysisParam(optFilter: mutable.HashMap[String, String],
-                      dimFilter: mutable.HashMap[String, mutable.HashMap[String, Float]],
-                      targetOptions: Array[String],
-                      targetDimIntervals: mutable.HashMap[String, Array[Float]])
-
-
-case class CalcResult(succeed: Boolean, msg: String, analysisResult: AnalysisResult)
