@@ -30,7 +30,7 @@ import scala.util.{Failure, Random, Success}
  */
 object FutureExamples {
     def main(args: Array[String]): Unit = {
-        BlockingExample
+        NonblockingExample()
     }
 
 
@@ -117,7 +117,7 @@ object FutureExamples {
 
         // 一旦创建了Future，该任务会立即进行调度，不需要类似于start这样的启动命令
         val f: Future[Int] = Future {
-            Thread.sleep(Random.nextInt(1000))
+            Thread.sleep(10000)
             1024/0
         }
 
@@ -137,7 +137,7 @@ object FutureExamples {
         }
 
         println("sleeping ...")
-        Thread.sleep(5000)  // 这里主线程可以一边等待Future的完成，一边继续干自己的其他事情
+        // Thread.sleep(5000)  // 这里主线程可以一边等待Future的完成，一边继续干自己的其他事情
         println("wake up ....")
     }
 

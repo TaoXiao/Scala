@@ -888,8 +888,9 @@ object Test {
     """.stripMargin
 
   def main(args: Array[String]): Unit = {
-   //  val x: Long = null
 
+
+   //  val x: Long = null
 
     /*
     val s = String.format(" %-70s 已创建", s""" "space:table" """)
@@ -933,9 +934,6 @@ object Test {
   def f3(): Unit = {
     println("I am f3")
   }
-
-
-
 
 }
 
