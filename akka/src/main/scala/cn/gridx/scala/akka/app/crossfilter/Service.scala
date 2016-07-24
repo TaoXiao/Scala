@@ -11,7 +11,12 @@ import spray.routing.HttpService
 
 import scala.concurrent.{Await, Future}
 import akka.pattern.ask
+import cn.gridx.scala.akka.app.crossfilter.Master.CalcResult
+import cn.gridx.scala.akka.app.crossfilter.ServiceActor.{JavaAnalysisParam, MSG_SM_RELOAD, MSG_SM_STARTCALC}
+import cn.gridx.scala.akka.app.crossfilter.Worker.MSG_WM_SM_TEST
 import com.google.gson.GsonBuilder
+
+import scala.collection.mutable
 
 /**
   * Created by tao on 7/17/16.
@@ -25,6 +30,7 @@ class ServiceActor extends Actor with HttpService {
   val cluster = Cluster(context.system)
   var master: Option[ActorRef] = None
   implicit val timeout = Timeout(60 seconds)
+
 
   /**
     * 订阅系统的消息
@@ -41,7 +47,7 @@ class ServiceActor extends Actor with HttpService {
     case MemberUp(member) =>
       onMemberUp(member)
     case UnreachableMember(member) =>
-
+      onUnreachableMember(member)
   }
 
   private def onMemberUp(member: Member): Unit = {
@@ -53,7 +59,7 @@ class ServiceActor extends Actor with HttpService {
   }
 
   private def onUnreachableMember(member: Member): Unit = {
-    logger.info(s"消息[MemberUp], member = ${RootActorPath(member.address)}")
+    logger.info(s"消息[MemberUnreachable], member = ${RootActorPath(member.address)}")
     if (member.hasRole(Roles.MASTER)) {
       logger.info("消息[UnreachableMember], master下线 (${RootActorPath(member.address)})")
       master = None
@@ -92,7 +98,7 @@ class ServiceActor extends Actor with HttpService {
           payload => {
             complete {
               logger.info(s"收到的payload为: \n$payload")
-              onCalc(payload)
+              onAnalyze(payload)
             }
           }
         }
@@ -105,7 +111,7 @@ class ServiceActor extends Actor with HttpService {
     if (master.isEmpty)
       return s"""{"succeed": false, "message" : "还未找到master actor! 请稍后再试"}"""
 
-    val future: Future[Any] = master.get ? WM_SM_TEST
+    val future: Future[Any] = master.get ? MSG_WM_SM_TEST
     Await.result(future, timeout.duration).toString
   }
 
@@ -121,7 +127,10 @@ class ServiceActor extends Actor with HttpService {
   }
 
 
-  private def onCalc(payload: String): String = {
+  /**
+    * 要求actor system开始分析数据
+    * */
+  private def onAnalyze(payload: String): String = {
     if (master.isEmpty)
       return s"""{"succeed": false, "message" : "还未找到master actor! 请稍后再试"}"""
 
@@ -165,6 +174,59 @@ class ServiceActor extends Actor with HttpService {
     val gson = new GsonBuilder().serializeNulls().create()
     val javaParam = gson.fromJson(json, classOf[JavaAnalysisParam])
     javaParam.toAnalysisParam()
+  }
+
+}
+
+
+object ServiceActor {
+  /**
+    * 我们需要将外界传入的JSON转为为一个case class, 但是Gson不支持Scala Collections
+    * 所以我们首先将JSON转换为`JavaAnalysisParam`, 然后再将`JavaAnalysisParam`转换为`AnalysisParam`
+    *
+    * `AnalysisParam`是一个Scala case class
+    * */
+  final case class JavaAnalysisParam(optionFilter: java.util.HashMap[String, String],
+                                     dimensionFilter: java.util.HashMap[String, java.util.HashMap[String, Double]],
+                                     targetOptions: Array[String],
+                                     targetDimensions: java.util.HashMap[String, Array[Double]]) {
+    def toAnalysisParam(): AnalysisParam = {
+      val scalaOptFilter = Commons.JavaMap2ScalaMap(optionFilter)
+
+      val scalaDimensionFilter = mutable.HashMap[String, mutable.HashMap[String, Double]]()
+      var kIt = dimensionFilter.keySet().iterator()
+      while (kIt.hasNext) {
+        val key = kIt.next()
+        val value = dimensionFilter.get(key)
+        scalaDimensionFilter.put(key, Commons.JavaMap2ScalaMap(value))
+      }
+
+      val scalaTargetDimension = mutable.HashMap[String, Array[Double]]()
+      kIt = targetDimensions.keySet().iterator()
+      while (kIt.hasNext) {
+        val key = kIt.next()
+        val value = targetDimensions.get(key)
+        scalaTargetDimension.put(key, value)
+      }
+
+      AnalysisParam(scalaOptFilter, scalaDimensionFilter, targetOptions, scalaTargetDimension)
+    }
+  }
+
+
+  final case class MSG_SM_RELOAD(path: String)
+
+
+  final case class MSG_SM_STARTCALC(analysisParam: AnalysisParam)
+
+  /**
+    * 要求master开始计算 sorted population histogram
+    * 计算的基础是总体的数据, 计算的对象是`targetDimName`
+    *
+    * 也就是说, 我们要计算`targetDimName`在全体数据中是怎样分布的, 返回结果要按照`targetDimName`对应的值得降序排列
+    * */
+  final case class MSG_SM_SortedPopHist(targetDimName: String) {
+
   }
 }
 

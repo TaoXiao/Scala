@@ -4,7 +4,10 @@ import java.io.File
 
 import akka.actor.{Actor, ActorPath, ActorRef, ActorSystem, Props, RootActorPath}
 import akka.util.Timeout
-import com.google.gson.{Gson, GsonBuilder}
+import cn.gridx.scala.akka.app.crossfilter.Master.{CalcResult, MSG_MS_TEST, MSG_MW_STARTANALYSIS, MSG_MW_STARTLOAD}
+import cn.gridx.scala.akka.app.crossfilter.ServiceActor.MSG_SM_STARTCALC
+import cn.gridx.scala.akka.app.crossfilter.Worker.{MSG_WM_ANALYSIS_FINISHED, MSG_WM_LOAD_FINISHED, MSG_WM_REGISTER, MSG_WM_SM_TEST}
+import com.google.gson.{Gson, GsonBuilder, JsonObject}
 
 import scala.concurrent.duration._
 import com.typesafe.config.{Config, ConfigFactory}
@@ -52,7 +55,7 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
       onMsgWmAnalysisFinished(actorPath, elapsed, analysisResult)
 
     // spray -> master 测试消息
-    case WM_SM_TEST =>
+    case MSG_WM_SM_TEST =>
       logger.info("收到了消息 WM_SM_TEST")
       sender() ! MSG_MS_TEST
   }
@@ -208,7 +211,7 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
     *      M = ArrayBuffer(M1, M2, M3)
     * 则   mergerAnalysisResults(M) =
     *         Map(E1 -> Map(-1 -> 0, 0 -> 0, 1 -> 12, 2 -> 15), TOUA -> Map(-1 -> 30, 0 -> 27, 1 -> 24, 2 -> 21), E6 -> Map(-1 -> 0, 0 -> 0, 1 -> 0, 2 -> 0))
-              *Map(D -> Map(N -> 81), A -> Map(Y -> 81), C -> Map(N -> 81), E -> Map(Y -> 6, N -> 75), B -> Map(N -> 81))
+    *Map(D -> Map(N -> 81), A -> Map(Y -> 81), C -> Map(N -> 81), E -> Map(Y -> 6, N -> 75), B -> Map(N -> 81))
     * */
   private def mergeAnalysisResults(analysisResults: mutable.ArrayBuffer[AnalysisResult]): AnalysisResult = {
     val finalDimDistri = mutable.HashMap[String, TreeMap[Int, Int]]() // key - dimName,   value: dimDistri
@@ -329,13 +332,15 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
     for (worker <- workers)
       worker ! MSG_MW_STARTANALYSIS(param.optFilter, param.dimFilter, param.targetOptions, param.targetDimensions)
   }
+
 }
 
 
 
 
 object Master  {
-  case class CmdParam(dataPath: String = null, minWorkerActors: Int = -1)
+  /** 这是启动Master时的命令参数  */
+  final case class CmdParam(dataPath: String = null, minWorkerActors: Int = -1)
 
   val logger = LoggerFactory.getLogger(this.getClass())
 
@@ -374,6 +379,62 @@ object Master  {
     }
   }
 
+
+
+  /**
+    * 将各个worker actors计算出的结果汇总后, 整合后装配成一个最终的结果返回给外界的查询者
+    * 由于外界往往需要将返回结果组织成json格式,所以这里加了一个`toJson`的方法
+    * */
+  final case class CalcResult(succeed: Boolean, msg: String, analysisResult: AnalysisResult) {
+    def toJson(): String = {
+      val gson: Gson = new GsonBuilder().serializeNulls().create()
+      val jObj = new JsonObject()
+      jObj.addProperty("succeed", succeed)
+      jObj.addProperty("message", msg)
+
+      if (succeed) {
+        val jDim = new JsonObject()
+        for ((k, v) <- analysisResult.dimDistributions) {
+          jDim.add(k, Map2Json(v))
+        }
+
+        val jOpt = new JsonObject()
+        for ((k, v) <- analysisResult.optDistributions) {
+          jOpt.add(k, Map2Json(v))
+        }
+
+        jObj.add("dimensions", jDim)
+        jObj.add("options", jOpt)
+      }
+
+      jObj.toString
+    }
+
+    private def Map2Json[A, B](map: Map[A, B]): JsonObject = {
+      val jMap = new JsonObject()
+      for ((k, v) <- map)
+        jMap.addProperty(k.toString, v.toString)
+      jMap
+    }
+
+    private def Map2Json[A, B](map: mutable.Map[A, B]): JsonObject = {
+      val jMap = new JsonObject()
+      for ((k, v) <- map)
+        jMap.addProperty(k.toString, v.toString)
+      jMap
+    }
+  }
+
+
+  final case class MSG_MW_STARTLOAD(path: String, start: Int, range: Int)
+
+  final case class MSG_MW_STARTANALYSIS(optFilter: mutable.HashMap[String, String],
+                                  dimFilter: mutable.HashMap[String, mutable.HashMap[String, Double]],
+                                  targetOptions: Array[String],
+                                  dimIntervals: mutable.HashMap[String, Array[Double]])
+
+
+  final case class MSG_MS_TEST()
 
   /**
     * 仅仅作测试用

@@ -6,13 +6,19 @@ import scala.io.Source
 
 /**
   * Created by tao on 7/20/16.
+  *
+  * 生成usage impact数据文件
   */
 object CalcUsageImpact {
   def TokenSep = ","
 
   def main(args: Array[String]): Unit = {
-    calcByDiff(args(0), args(1), null)
+    calcByDiff(args(0), args(1), null, AbsDiffMode())
   }
+
+  sealed trait DiffMode
+  final case class AbsDiffMode() extends DiffMode // 绝对差值的形式
+  final case class PercentMode() extends DiffMode // 百分比的形式
 
   /**
     * 按照绝对值差额进行usage impact的计算
@@ -25,8 +31,13 @@ object CalcUsageImpact {
     *      如果dim1 = ETOUC, dim2 = ETOUC, 由于上面的这条数据中没有ETOUC属性, 所以该记录丢弃不输出
     *
     * */
-  def calcByDiff(inPath: String, outPath: String, targetDimNames: List[(String, String)]): Unit = {
-    val writer = new PrintWriter(outPath)
+
+  def calcByDiff(inPath: String, outPath: String, targetDimNames: List[(String, String)], diffMode: DiffMode): Unit = {
+    val postfix = diffMode match {
+      case AbsDiffMode() => ".abs"
+      case PercentMode() => ".percent"
+    }
+    val writer = new PrintWriter(outPath + postfix)
 
     for (line <- Source.fromFile(inPath).getLines()) {
       val tokens = line.split(TokenSep)
@@ -51,8 +62,17 @@ object CalcUsageImpact {
       }
 
       // 开始计算diff
-      for (p <- dimNamePairs)
-        result += s",dim:${p._1}-${p._2}:${dimension.get(p._1).get - dimension.get(p._2).get}"
+      for (p <- dimNamePairs) {
+        diffMode match {
+          case AbsDiffMode() =>
+            result += s",dim:${p._1}-${p._2}:${dimension.get(p._1).get - dimension.get(p._2).get}"
+          case PercentMode() =>
+            if (0 != dimension.get(p._2).get)
+              result += s",dim:${p._1}-${p._2}:${(dimension.get(p._1).get - dimension.get(p._2).get)/dimension.get(p._2).get}"
+          case _ =>
+            throw new RuntimeException("Illegal diff mode")
+        }
+      }
 
       writer.println(result)
     }

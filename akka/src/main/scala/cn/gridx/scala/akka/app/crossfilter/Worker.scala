@@ -5,9 +5,12 @@ import akka.actor.{Actor, ActorPath, ActorRef, ActorSystem, Address, Props, Root
 import akka.cluster.ClusterEvent.{MemberUp, UnreachableMember}
 import akka.cluster.{Cluster, ClusterEvent, Member}
 import akka.util.Timeout
+import cn.gridx.scala.akka.app.crossfilter.Master.{MSG_MW_STARTANALYSIS, MSG_MW_STARTLOAD}
+import cn.gridx.scala.akka.app.crossfilter.Worker.{MSG_WM_ANALYSIS_FINISHED, MSG_WM_LOAD_FINISHED, MSG_WM_REGISTER}
 import com.typesafe.config.ConfigFactory
 import org.slf4j.LoggerFactory
 import scopt.OptionParser
+
 import scala.collection.mutable
 import scala.concurrent.{Await, Future}
 
@@ -171,4 +174,17 @@ object Worker {
     val system = ActorSystem("CrossFilterSystem", config)
     system.actorOf(Props[Worker], name = actorName)
   }
+
+
+
+  case class MSG_WM_REGISTER()
+
+  case class MSG_WM_LOAD_FINISHED(elapsed: Long)
+
+  case class MSG_WM_ANALYSIS_FINISHED(actorPath: ActorPath, elapsed: Long, analysisResult: AnalysisResult)
+
+  case class MSG_WM_SM_TEST()
+
+  case class CmdParams(actorType: String = "unknown", actorNumber: Int = -1)
+
 }
