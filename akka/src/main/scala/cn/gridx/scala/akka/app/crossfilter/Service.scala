@@ -12,7 +12,7 @@ import spray.routing.HttpService
 import scala.concurrent.{Await, Future}
 import akka.pattern.ask
 import cn.gridx.scala.akka.app.crossfilter.Master.CalcResult
-import cn.gridx.scala.akka.app.crossfilter.ServiceActor.{JavaAnalysisParam, MSG_SM_RELOAD, MSG_SM_STARTCALC}
+import cn.gridx.scala.akka.app.crossfilter.ServiceActor.{JavaAnalysisParam, MSG_SM_RELOAD, MSG_SM_STARTCALC, MSG_SM_SortedPopHist}
 import cn.gridx.scala.akka.app.crossfilter.Worker.MSG_WM_SM_TEST
 import com.google.gson.GsonBuilder
 
@@ -103,6 +103,16 @@ class ServiceActor extends Actor with HttpService {
           }
         }
       }
+    } ~ path ("sortedPopHist") {
+      get {
+        parameters('targetDimName.as[String]) {
+          (dimension) => {
+            complete {
+              onSortedPopHist()
+            }
+          }
+        }
+      }
     }
   }
 
@@ -137,6 +147,20 @@ class ServiceActor extends Actor with HttpService {
     val future: Future[Any] = master.get ? MSG_SM_STARTCALC(parsePayload(payload))
     val result = Await.result(future, timeout.duration).asInstanceOf[CalcResult]
     result.toJson()
+  }
+
+
+  /**
+    * 要计算`targetDimName`在全体数据中是怎样分布的, 返回结果要按照`targetDimName`对应的值得降序排列
+    * */
+  private def onSortedPopHist(): String = {
+    if (master.isEmpty)
+      return s"""{"succeed": false, "message" : "还未找到master actor! 请稍后再试"}"""
+
+    // todo:
+    val future: Future[Any] = master.get ? MSG_SM_SortedPopHist(PopHistParam(null, null, "", -1))
+    val result = Await.result(future, timeout.duration)
+    result.toString
   }
 
   /*
@@ -225,9 +249,7 @@ object ServiceActor {
     *
     * 也就是说, 我们要计算`targetDimName`在全体数据中是怎样分布的, 返回结果要按照`targetDimName`对应的值得降序排列
     * */
-  final case class MSG_SM_SortedPopHist(targetDimName: String) {
-
-  }
+  final case class MSG_SM_SortedPopHist(popHistParam: PopHistParam)
 }
 
 

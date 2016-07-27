@@ -86,5 +86,22 @@ final case class AnalysisParam(optFilter: mutable.HashMap[String, String],
 }
 
 
+/**
+  * 查询sorted population histogram时的查询参数
+  *
+  * 查询过程:
+  *   1) 根据 optFilter 及 dimFilter 过滤掉不满足要求的数据
+  *   2) 对剩余的数据进行排序, 排序的目标维度是`targetDim`, 按照降序排列
+  *   3) 从排序后的数据中均匀地取出`sampleSize`个样本
+  *
+  * 返回结果:
+  *   返回`sampleSize`个样本, 每个样本的结构包括: 该样本在排序后数据中的位置, 以及该样本在`targetDim`维度上的值
+  *
+  * */
+final case class PopHistParam(optFilter: mutable.HashMap[String, String],
+                              dimFilter: mutable.HashMap[String, mutable.HashMap[String, Double]],
+                              targetDim: String, sampleSize: Int)
+
+
 
 

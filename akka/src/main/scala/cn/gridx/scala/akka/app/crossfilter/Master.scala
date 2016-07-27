@@ -5,7 +5,7 @@ import java.io.File
 import akka.actor.{Actor, ActorPath, ActorRef, ActorSystem, Props, RootActorPath}
 import akka.util.Timeout
 import cn.gridx.scala.akka.app.crossfilter.Master.{CalcResult, MSG_MS_TEST, MSG_MW_STARTANALYSIS, MSG_MW_STARTLOAD}
-import cn.gridx.scala.akka.app.crossfilter.ServiceActor.MSG_SM_STARTCALC
+import cn.gridx.scala.akka.app.crossfilter.ServiceActor.{MSG_SM_STARTCALC, MSG_SM_SortedPopHist}
 import cn.gridx.scala.akka.app.crossfilter.Worker.{MSG_WM_ANALYSIS_FINISHED, MSG_WM_LOAD_FINISHED, MSG_WM_REGISTER, MSG_WM_SM_TEST}
 import com.google.gson.{Gson, GsonBuilder, JsonObject}
 
@@ -50,14 +50,19 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
     case MSG_WM_LOAD_FINISHED(elapsed) =>
       onMsgWmLoadFinish(sender(), elapsed)
 
-    // worker ->  worker计算完了自己的数据
+    // worker ->  worker 计算完了自己的数据
     case MSG_WM_ANALYSIS_FINISHED(actorPath, elapsed, analysisResult) =>
       onMsgWmAnalysisFinished(actorPath, elapsed, analysisResult)
+
+    // spray -> master , 要求计算sorted population histogram
+    case MSG_SM_SortedPopHist(popHistParam) =>
+      onMsgSmSortedPopHist(popHistParam)
 
     // spray -> master 测试消息
     case MSG_WM_SM_TEST =>
       logger.info("收到了消息 WM_SM_TEST")
       sender() ! MSG_MS_TEST
+
   }
 
 
@@ -198,6 +203,18 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
       logger.info(s"全部的worker分析完成, 总体耗时 ${totalElapsed/1000} 秒\n")
       forwardAnalysisResult2QueryingActor(totalElapsed) // 把所有的结果融合起来, 然后将结果返回给spray actor
     }
+  }
+
+
+  /**
+    * 要计算`targetDimName`在全体数据中是怎样分布的, 返回结果要按照`targetDimName`对应的值得降序排列
+    *
+    * 计算过程: 让各个actors在自己的数据范围内计算出各自数据的quantiles, 然后
+    *
+    *
+    * */
+  private def onMsgSmSortedPopHist(param: PopHistParam): Unit = {
+
   }
 
 
