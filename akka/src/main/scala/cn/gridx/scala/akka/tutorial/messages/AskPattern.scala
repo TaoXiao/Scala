@@ -24,7 +24,7 @@ object AskPattern {
     /**
       * 以ask模式来向一个actor发送消息时,需要一个 implicit `akka.util.Timeout`
       * */
-    implicit val timeout = Timeout(20 seconds)
+    implicit val timeout = Timeout(1 seconds)
 
     /**
       * 向三个actor以ask的方式发送消息,并且等待它们的回复消息

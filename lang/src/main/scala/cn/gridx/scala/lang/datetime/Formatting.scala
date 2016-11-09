@@ -11,6 +11,8 @@ import org.joda.time.{DateTime, DateTimeZone}
   */
 object Formatting {
   def main(args: Array[String]): Unit = {
+    println(new DateTime(2145916800000L))
+
     // DateTimeZone.setDefault(DateTimeZone.forID("America/Los_Angeles"))
     val day: DateTime = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss").parseDateTime("2016-03-06 12:34:56")
     val milli = day.getMillis

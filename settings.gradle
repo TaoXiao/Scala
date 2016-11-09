@@ -4,4 +4,6 @@ include 'spark'
 include 'log4j2'
 include 'database'
 include 'pooling'
+include 'plugin'
+include 'logback'
 

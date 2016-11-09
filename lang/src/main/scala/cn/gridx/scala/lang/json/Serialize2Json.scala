@@ -1,11 +1,9 @@
 package cn.gridx.scala.lang.json
 
-import java.lang.reflect.Type
 import java.util
 
 import com.google.gson._
 
-import scala.util.parsing.json.JSONObject
 
 
 /**
@@ -16,7 +14,8 @@ object Serialize2Json {
     // Serialize_PrimaryTypes
     // Serialize_CustomTypes
     // renameFileds
-    UseJsonSerializer
+    // UseJsonSerializer
+    InsertSubJson
   }
 
 
@@ -92,6 +91,31 @@ object Serialize2Json {
     * 在一个JSON中插入一个sub-json
     */
   def InsertSubJson(): Unit = {
+    val gson = new Gson()
+    val jArr = new JsonArray()
+    // val m: HashMap[String, String] = HashMap("A" -> "a")
+    import scala.collection.JavaConversions._
+    // val g: JsonElement = gson.toJsonTree(m)
+    val m1 = new util.HashMap[String, String]()
+    m1.put("A", "a")
+    val m2 = new util.HashMap[String, String]()
+    m2.put("B", "b")
+    val m3 = new util.HashMap[String, String]()
+    m3.put("C", "c")
+
+    jArr.add(gson.toJsonTree(m1))
+    jArr.add(gson.toJsonTree(m2))
+    println(jArr)
+
+    val jSubObj = new JsonObject()
+    jSubObj.addProperty("A", "a")
+    jSubObj.addProperty("C", "c")
+    jSubObj.addProperty("B", "b")
+
+
+    val jObj = new JsonObject()
+    jObj.add("bootingTimes", jSubObj)
+    println(jObj)
 
   }
 

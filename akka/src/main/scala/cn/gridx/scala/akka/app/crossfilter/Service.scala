@@ -11,8 +11,8 @@ import spray.routing.HttpService
 
 import scala.concurrent.{Await, Future}
 import akka.pattern.ask
-import cn.gridx.scala.akka.app.crossfilter.Master.CalcResult
-import cn.gridx.scala.akka.app.crossfilter.ServiceActor.{JavaAnalysisParam, MSG_SM_RELOAD, MSG_SM_STARTCALC, MSG_SM_SortedPopHist}
+import cn.gridx.scala.akka.app.crossfilter.Master.{MasterAnalysisResult, Master_PopHistoResult}
+import cn.gridx.scala.akka.app.crossfilter.ServiceActor._
 import cn.gridx.scala.akka.app.crossfilter.Worker.MSG_WM_SM_TEST
 import com.google.gson.GsonBuilder
 
@@ -24,12 +24,12 @@ import scala.collection.mutable
 
 class ServiceActor extends Actor with HttpService {
   override def actorRefFactory = context
-  override def receive = runRoute(route) orElse msgProcessor
+  override def receive: PartialFunction[Any, Unit] = runRoute(route) orElse msgProcessor
 
   val logger = LoggerFactory.getLogger(this.getClass())
   val cluster = Cluster(context.system)
   var master: Option[ActorRef] = None
-  implicit val timeout = Timeout(60 seconds)
+  implicit val timeout = Timeout(30 seconds)
 
 
   /**
@@ -104,11 +104,12 @@ class ServiceActor extends Actor with HttpService {
         }
       }
     } ~ path ("sortedPopHist") {
-      get {
-        parameters('targetDimName.as[String]) {
-          (dimension) => {
+      post {
+        entity(as[String]) {
+          payload => {
             complete {
-              onSortedPopHist()
+              logger.info(s"收到的参数为: \n$payload")
+              onSortedPopHist(payload)
             }
           }
         }
@@ -144,23 +145,26 @@ class ServiceActor extends Actor with HttpService {
     if (master.isEmpty)
       return s"""{"succeed": false, "message" : "还未找到master actor! 请稍后再试"}"""
 
-    val future: Future[Any] = master.get ? MSG_SM_STARTCALC(parsePayload(payload))
-    val result = Await.result(future, timeout.duration).asInstanceOf[CalcResult]
+    val future: Future[Any] = master.get ? MSG_SM_START_ANALYSIS(parseAnalysisParamsPayload(payload))
+    val result = Await.result(future, timeout.duration).asInstanceOf[MasterAnalysisResult]
     result.toJson()
   }
 
 
   /**
-    * 要计算`targetDimName`在全体数据中是怎样分布的, 返回结果要按照`targetDimName`对应的值得降序排列
+    * 要计算`targetDimName`在全体数据中是怎样分布的, 返回结果要按照`targetDimName`对应的值的降序排列
+    *
+    *
+    *
     * */
-  private def onSortedPopHist(): String = {
+  private def onSortedPopHist(payload: String): String = {
     if (master.isEmpty)
       return s"""{"succeed": false, "message" : "还未找到master actor! 请稍后再试"}"""
 
-    // todo:
-    val future: Future[Any] = master.get ? MSG_SM_SortedPopHist(PopHistParam(null, null, "", -1))
-    val result = Await.result(future, timeout.duration)
-    result.toString
+    val future = master.get ? SortedPopHist.MSG_SM_QUERY_POPHIST(SortedPopHist.parseQueryPayload(payload))
+    val result = Await.result(future, timeout.duration).asInstanceOf[Master_PopHistoResult]
+
+    result.msg
   }
 
   /*
@@ -194,7 +198,7 @@ class ServiceActor extends Actor with HttpService {
                   targetOptions: Array[String],
                   targetDimensions: mutable.HashMap[String, Array[Double]])
    */
-  private def parsePayload(json: String): AnalysisParam = {
+  private def parseAnalysisParamsPayload(json: String): AnalysisParam = {
     val gson = new GsonBuilder().serializeNulls().create()
     val javaParam = gson.fromJson(json, classOf[JavaAnalysisParam])
     javaParam.toAnalysisParam()
@@ -238,18 +242,12 @@ object ServiceActor {
   }
 
 
+
   final case class MSG_SM_RELOAD(path: String)
 
 
-  final case class MSG_SM_STARTCALC(analysisParam: AnalysisParam)
+  final case class MSG_SM_START_ANALYSIS(analysisParam: AnalysisParam)
 
-  /**
-    * 要求master开始计算 sorted population histogram
-    * 计算的基础是总体的数据, 计算的对象是`targetDimName`
-    *
-    * 也就是说, 我们要计算`targetDimName`在全体数据中是怎样分布的, 返回结果要按照`targetDimName`对应的值得降序排列
-    * */
-  final case class MSG_SM_SortedPopHist(popHistParam: PopHistParam)
 }
 
 

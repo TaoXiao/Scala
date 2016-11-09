@@ -4,6 +4,7 @@ import org.slf4j.LoggerFactory
 
 import scala.collection.immutable.TreeMap
 import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 import scala.io.Source
 
 
@@ -12,7 +13,10 @@ import scala.io.Source
   */
 class CrossFilter {
   val logger = LoggerFactory.getLogger(this.getClass())
-  private var source: Array[Record] = _
+  private var source: Array[Record] = null
+
+
+  def GetSourceData() = source
 
 
   /**
@@ -56,14 +60,17 @@ class CrossFilter {
     *                        所以, 返回值数组的长度 = 对应的维度的interval数组长度 + 1
     *                        注: key从-1开始计数
     *
-    *         `mutable.HashMap[String, util.HashMap[String, Int]]` - 每一个options上各个value的分布
+    *         `mutable.HashMap[String, util.HashMap[String, Int]]` - 这每一个options上各个value的分布
+    *         `mutable.HashMap[String, ArrayBuffer[Double]]` - 这是经过过滤后的所有dimensions数据, 以便于当sorted poppulation histogram需要时使用
     *
     * */
   def doFiltering(optFilter: mutable.HashMap[String, String],
                   dimFilter: mutable.HashMap[String, mutable.HashMap[String, Double]],
                   targetOptions: Array[String],
                   targetDimensions: mutable.HashMap[String, Array[Double]])
-  : (mutable.HashMap[String, TreeMap[Int, Int]], mutable.HashMap[String, mutable.HashMap[String, Int]]) // 可以是部分的dimension
+  : (mutable.HashMap[String, TreeMap[Int, Int]],
+    mutable.HashMap[String, mutable.HashMap[String, Int]],
+    mutable.HashMap[String, ArrayBuffer[Double]])
   = {
     // 最后要返回的结果
     val dimDistributions = new mutable.HashMap[String, TreeMap[Int, Int]]()
@@ -79,9 +86,12 @@ class CrossFilter {
       optDistributions.put(optName, mutable.HashMap[String, Int]())
     }
 
+    // 将source中经过过滤后的所有dimensions存储在filteredDimensionData内, 以便于当sorted poppulation histogram需要时使用
+    val filteredDimensions = mutable.HashMap[String, ArrayBuffer[Double]]()
+
     // 针对每一条数据进行分析
     for (record <- source if satisfyOpts(record.opts, optFilter) && satisfyDims(record.dims, dimFilter) ) {
-      // 计算每一个options的每一个value的分布
+      // 计算每一个target option的分布情况
       for ((optName, optValue) <- record.opts if targetOptions.contains(optName)) {
         val optDistri = optDistributions.get(optName).get
         if (!optDistri.contains(optValue))
@@ -91,22 +101,30 @@ class CrossFilter {
       }
 
       // 计算每一个维度上每一个interval的分布
-      for ((dimName, dimValue) <- record.dims if targetDimensions.contains(dimName)) {
-        val interval: Array[Double] = targetDimensions.get(dimName).get
-        val pos = calcDistribution(dimValue, interval)
-        var dimDistri: TreeMap[Int, Int] = dimDistributions.get(dimName).get
-        if (!dimDistri.contains(pos))
-          dimDistri += (pos -> 1)
-        else {
-          val newValue = dimDistri.get(pos).get + 1
-          dimDistri -= pos
-          dimDistri += (pos -> newValue)
+      for ((dimName, dimValue) <- record.dims) {
+        // 现在, 每一个record都通过了cross filter的条件, 我们要将其dimension data放入到`filteredDimensions`中
+        if (!filteredDimensions.contains(dimName))
+          filteredDimensions.put(dimName, ArrayBuffer[Double]())
+        filteredDimensions.get(dimName).get.append(dimValue)
+
+        // 再计算每一个target dimension的分布情况
+        if (targetDimensions.contains(dimName)) {
+          val interval: Array[Double] = targetDimensions.get(dimName).get
+          val pos = calcDistribution(dimValue, interval)
+          var dimDistri: TreeMap[Int, Int] = dimDistributions.get(dimName).get
+          if (!dimDistri.contains(pos))
+            dimDistri += (pos -> 1)
+          else {
+            val newValue = dimDistri.get(pos).get + 1
+            dimDistri -= pos
+            dimDistri += (pos -> newValue)
+          }
+          dimDistributions.put(dimName, dimDistri)
         }
-        dimDistributions.put(dimName, dimDistri)
       }
     }
 
-    (dimDistributions, optDistributions)
+    (dimDistributions, optDistributions, filteredDimensions)
   }
 
 

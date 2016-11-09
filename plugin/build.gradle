@@ -1,0 +1,28 @@
+group = 'cn.gridx'
+version = '1.0-SNAPSHOT'
+
+apply plugin: 'java'
+apply plugin: 'scala'
+
+dependencies {
+    compile gradleApi()
+}
+
+apply plugin: 'maven'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    testCompile 'junit:junit:4.11'
+    compile 'org.scala-lang:scala-library:2.10.4',
+            'com.amazonaws:aws-java-sdk:1.9.6'
+}
+
+
+uploadArchives {
+    repositories {
+        mavenLocal()
+    }
+}

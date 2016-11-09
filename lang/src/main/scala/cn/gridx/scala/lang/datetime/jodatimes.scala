@@ -9,8 +9,21 @@ import org.joda.time.DateTime
   */
 object jodatimes {
   def main(args: Array[String]): Unit = {
+    val d1 = new DateTime("2015-04-16T00:00:00.000-07:00")
+    val d2 = new DateTime("2015-04-16T23:00:00.000-07:00")
+    val t1 = new DateTime("2015-04-16T20:00:00.000-07:00")
+    val t2 = new DateTime("2015-05-16T20:00:00.000-07:00")
+    if (!t1.isBefore(d1) && !t1.isAfter(d2))
+      println("t1 yes")
+    else
+      println("t1 no")
+
+    if (!t2.isBefore(d1) && !t2.isAfter(d2))
+      println("t2 yes")
+    else
+      println("t2 no")
     // compareDate
-     long2Date
+    // long2Date
     // moveDate
     // getSharpClock
   }

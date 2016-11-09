@@ -33,6 +33,13 @@ object Driver {
         testVariablePattern_4(300)      // 输出：x3 => 300
         testVariablePattern_4(400)      // 输出：does not match
 
+
+      println("+"*20)
+      testVariablePattern_6("res")
+      testVariablePattern_6("com")
+      testVariablePattern_6("agr")
+      testVariablePattern_6("hello")
+
     }
 
 
@@ -113,4 +120,26 @@ object Driver {
             case _  => println("does not match")
         }
     }
+
+    def testVariablePattern_6(x: String) = {
+        x match {
+          case contractScopes.`resSS` =>
+            println("RES")
+          case contractScopes.`com` =>
+            println("COM")
+          case contractScopes.`agr` =>
+            println("AGR")
+          case x =>
+            println(s"unknown : $x")
+        }
+
+    }
+
+}
+
+
+object contractScopes {
+  val resSS = "res"
+  val com = "com"
+  val agr = "agr"
 }

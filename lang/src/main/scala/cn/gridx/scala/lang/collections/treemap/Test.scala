@@ -7,14 +7,14 @@ import scala.collection.immutable.TreeMap
   */
 object Test extends App {
   var m =  TreeMap[Int, Int]()
-  m += (1 -> 100)
-  m += (2 -> 200)
-  m += (3 -> 300)
+  m += (1 -> 10)
+  m += (2 -> 20)
+  m += (3 -> 30)
+  m += (0 -> 0)
+
+  m += (2 -> 21)
+  m += (2 -> 19)
+
   println(m)
 
-  m -= 3
-  println(m)
-
-  m += (4 -> 400)
-  println(m)
 }

@@ -9,11 +9,7 @@ import org.joda.time.format.{DateTimeFormat, DateTimeFormatter}
 object SortExamples {
 
   def main(args: Array[String]): Unit = {
-    //DateTimeZone.setDefault(DateTimeZone.forID("America/Los_Angeles"))
-    //val day = DateTimeFormat.forPattern("yyyy-MM-dd HH:mm:ss").parseDateTime("2016-05-06 12:34:56")
-    //println(day)
-
-    // println(new DateTime(1457769540000L))
+    complexSorting()
   }
 
 
@@ -25,5 +21,13 @@ object SortExamples {
   }
 
   private case class Period(start: Long, end: Long)
+
+  // 复合排序
+  def complexSorting(): Unit = {
+    val L = List((1, 22), (1, 3), (1, 14), (0, 15), (3, 18), (2, 0), (3, 0))
+    L.sortBy(x => (x._1, x._2)).foreach(println)
+
+  }
+
 
 }

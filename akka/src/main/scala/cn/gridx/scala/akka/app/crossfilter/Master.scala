@@ -4,9 +4,10 @@ import java.io.File
 
 import akka.actor.{Actor, ActorPath, ActorRef, ActorSystem, Props, RootActorPath}
 import akka.util.Timeout
-import cn.gridx.scala.akka.app.crossfilter.Master.{CalcResult, MSG_MS_TEST, MSG_MW_STARTANALYSIS, MSG_MW_STARTLOAD}
-import cn.gridx.scala.akka.app.crossfilter.ServiceActor.{MSG_SM_STARTCALC, MSG_SM_SortedPopHist}
-import cn.gridx.scala.akka.app.crossfilter.Worker.{MSG_WM_ANALYSIS_FINISHED, MSG_WM_LOAD_FINISHED, MSG_WM_REGISTER, MSG_WM_SM_TEST}
+import cn.gridx.scala.akka.app.crossfilter.Master.{MSG_MS_TEST, MSG_MW_START_ANALYSIS, MSG_MW_START_LOAD, MasterAnalysisResult, Master_PopHistoResult}
+import cn.gridx.scala.akka.app.crossfilter.ServiceActor.MSG_SM_START_ANALYSIS
+import cn.gridx.scala.akka.app.crossfilter.SortedPopHist.{MSG_MW_QUERY_POPHIST, MSG_SM_QUERY_POPHIST, PopHistParam}
+import cn.gridx.scala.akka.app.crossfilter.Worker._
 import com.google.gson.{Gson, GsonBuilder, JsonObject}
 
 import scala.concurrent.duration._
@@ -28,19 +29,28 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
   val workers = ArrayBuffer[ActorRef]()       //  将所有的worker actors存储在这里
   var numLoadingFinished  : Int     = 0       //  多少个worker加载完成了
   var numAnalysisFinished : Int     = 0       //  多少个worker完成了对自己数据的分析
+  var numSampleWorkerFinished: Int  = 0       //  多少个worker完成了对自己数据中的samples的计算
   var loadingStarted      : Boolean = false   //  是否已经开始load数据
   var loadingFinished     : Boolean = false   //  是否所有的worker已经加载完自己的数据了
   var ts_startLoading     : Long    = _       //  对加载数据开始计时
   var ts_startAnalysis    : Long    = _       //  对每次的分析结果开始计时
+  var ts_startPopHist     : Long    = _       //  对每次计算sorted population histogram进行计时
   var queryingActor: Option[ActorRef] = None  //  当前是否有某个spray发起了请求, 但是还未被处理完
 
-  // 在一次查询中, 将每一个worker返回的结果记录在这里
-  val analysisResultSet: mutable.ArrayBuffer[AnalysisResult] = mutable.ArrayBuffer[AnalysisResult]()
+  // 在一次cross filter查询中, 将每一个worker返回的结果记录在这里
+  val analysisResultSet: mutable.ArrayBuffer[WorkerAnalysisResult] = mutable.ArrayBuffer[WorkerAnalysisResult]()
+
+  // 在一次quantiles查询中, 将每一个worker返回的结果记录在这里
+  val sampleResultArray: mutable.ArrayBuffer[Double] =  mutable.ArrayBuffer[Double]()
 
   override def receive = {
     // Spray -> Master : 开始分析数据
-    case MSG_SM_STARTCALC(analysisParam) =>
-      onMsgSmStartCalc(analysisParam)
+    case MSG_SM_START_ANALYSIS(analysisParam) =>
+      onMsgSmStartAnalysis(sender(), analysisParam)
+
+    // spray -> master , 要求计算sorted population histogram
+    case MSG_SM_QUERY_POPHIST(popHistParam) =>
+      onMsgSmStartPopHist(sender(), popHistParam)
 
     // Worker -> Master : 向master注册自己
     case MSG_WM_REGISTER =>
@@ -54,15 +64,13 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
     case MSG_WM_ANALYSIS_FINISHED(actorPath, elapsed, analysisResult) =>
       onMsgWmAnalysisFinished(actorPath, elapsed, analysisResult)
 
-    // spray -> master , 要求计算sorted population histogram
-    case MSG_SM_SortedPopHist(popHistParam) =>
-      onMsgSmSortedPopHist(popHistParam)
+    case MSG_WM_SAMPLES_GENERATED(actorPath, elapsed, samples) =>
+      onMsgWmSamplesGenerated(actorPath, elapsed, samples)
 
     // spray -> master 测试消息
     case MSG_WM_SM_TEST =>
       logger.info("收到了消息 WM_SM_TEST")
       sender() ! MSG_MS_TEST
-
   }
 
 
@@ -71,23 +79,40 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
     *
     * @param analysisParam - spray传来的参数
     */
-  def onMsgSmStartCalc(analysisParam: AnalysisParam): Unit = {
+  def onMsgSmStartAnalysis(sender: ActorRef, analysisParam: AnalysisParam): Unit = {
     ts_startAnalysis = System.currentTimeMillis()
     if (queryingActor.isDefined) {
       val msg = s"当前有请求还未被处理完毕, 请稍后再试!"
       logger.info(msg)
-      sender ! CalcResult(false, msg, null)
+      sender ! MasterAnalysisResult(false, msg, null)
     } else {
-      queryingActor = Some(sender())
+      queryingActor = Some(sender)
       val errorMsg = prepareAnalysis(analysisParam)
       if (null != errorMsg) {
-        queryingActor.get ! CalcResult(false, errorMsg, null)
+        queryingActor.get ! MasterAnalysisResult(false, errorMsg, null)
         queryingActor = None
         logger.info("将把queryingActor重置为None")
       } else {
         logger.info("正在指令各个worker开始分析自己的数据")
         doAnalysis(analysisParam)
       }
+    }
+  }
+
+
+  /**
+    * 要计算`targetDimName`在数据中(这里的数据可以是全体数据, 也可以是已经被cross filter过滤后的数据)是怎样分布的,
+    * 返回结果是目标维度`targetDimName`的n个quantiles
+    * */
+  private def onMsgSmStartPopHist(sender: ActorRef, param: PopHistParam): Unit = {
+    ts_startPopHist = System.currentTimeMillis()
+    if (queryingActor.isDefined) {
+      val msg = s"当前有请求还未被处理完毕, 请稍后再试!"
+      logger.info(msg)
+      sender ! SortedPopHist.MasterResult(false, msg, 0, null)
+    } else {
+      queryingActor = Some(sender)
+      doSortedPopHist(param)
     }
   }
 
@@ -149,7 +174,7 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
     val assignments: mutable.HashMap[Int, (Int, Int)] = assignData(dataPath, workers.size)
     for (i <- 0 until workers.size) {
       val (start, range) = assignments.get(i).get
-      workers(i) ! MSG_MW_STARTLOAD(dataPath, start, range)
+      workers(i) ! MSG_MW_START_LOAD(dataPath, start, range)
     }
   }
 
@@ -185,7 +210,7 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
   /**
     * 某个worker完成了对自己数据的分析
     * */
-  private def onMsgWmAnalysisFinished(actorPath: ActorPath, elapsed: Long, result: AnalysisResult): Unit = {
+  private def onMsgWmAnalysisFinished(actorPath: ActorPath, elapsed: Long, result: WorkerAnalysisResult): Unit = {
     logger.info(s"Worker[${RootActorPath(actorPath.address)}] 完成计算, 耗时 ${elapsed/1000} 秒, 计算结果为: \n" +
       s"dimDistribution = ${result.dimDistributions}\noptDistributions = ${result.optDistributions}\n")
 
@@ -207,15 +232,24 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
 
 
   /**
-    * 要计算`targetDimName`在全体数据中是怎样分布的, 返回结果要按照`targetDimName`对应的值得降序排列
-    *
-    * 计算过程: 让各个actors在自己的数据范围内计算出各自数据的quantiles, 然后
-    *
+    * 当某个worker产生了它的local samples, 并将包含结果的消息送到master时, 会触发此方法
     *
     * */
-  private def onMsgSmSortedPopHist(param: PopHistParam): Unit = {
+  private def onMsgWmSamplesGenerated(actorPath: ActorPath, elapsed: Long, samples: List[Double]): Unit = {
+    sampleResultArray.appendAll(samples)
+    numSampleWorkerFinished += 1
 
+    logger.info(s"收到了第${numSampleWorkerFinished}个worker的local sample")
+
+    // 全部的workers都算完了自己的local samples
+    if (numSampleWorkerFinished == workers.size) {
+      logger.info(s"全部的Local samples已经收齐了, 共有${sampleResultArray}个local samples")
+      queryingActor.get ! Master_PopHistoResult("共有${sampleResultArray}个local samples")
+    }
   }
+
+
+
 
 
   /**
@@ -230,7 +264,7 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
     *         Map(E1 -> Map(-1 -> 0, 0 -> 0, 1 -> 12, 2 -> 15), TOUA -> Map(-1 -> 30, 0 -> 27, 1 -> 24, 2 -> 21), E6 -> Map(-1 -> 0, 0 -> 0, 1 -> 0, 2 -> 0))
     *Map(D -> Map(N -> 81), A -> Map(Y -> 81), C -> Map(N -> 81), E -> Map(Y -> 6, N -> 75), B -> Map(N -> 81))
     * */
-  private def mergeAnalysisResults(analysisResults: mutable.ArrayBuffer[AnalysisResult]): AnalysisResult = {
+  private def mergeAnalysisResults(analysisResults: mutable.ArrayBuffer[WorkerAnalysisResult]): WorkerAnalysisResult = {
     val finalDimDistri = mutable.HashMap[String, TreeMap[Int, Int]]() // key - dimName,   value: dimDistri
     val finalOptDistri = mutable.HashMap[String, mutable.HashMap[String, Int]]()
 
@@ -255,7 +289,7 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
       }
     }
 
-    AnalysisResult(finalDimDistri, finalOptDistri)
+    WorkerAnalysisResult(finalDimDistri, finalOptDistri)
   }
 
 
@@ -308,7 +342,7 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
     }
 
     // 向spray actor回送经过merge后的结果
-    queryingActor.get ! CalcResult(true, s"计算成功, 耗时${elapsedMillis/1000.0}秒", mergeAnalysisResults(analysisResultSet))
+    queryingActor.get ! MasterAnalysisResult(true, s"计算成功, 耗时${elapsedMillis/1000.0}秒", mergeAnalysisResults(analysisResultSet))
     queryingActor = None
     analysisResultSet.clear()
     numAnalysisFinished = 0
@@ -347,9 +381,21 @@ class Master(dataPath: String, maxWorkerNum: Int) extends Actor {
     logger.info(s"查询参数为 : \n$param")
 
     for (worker <- workers)
-      worker ! MSG_MW_STARTANALYSIS(param.optFilter, param.dimFilter, param.targetOptions, param.targetDimensions)
+      worker ! MSG_MW_START_ANALYSIS(param.optFilter, param.dimFilter, param.targetOptions, param.targetDimensions)
   }
 
+
+  /**
+    * 指令各个worker去开始计算本actor上数据的sorted population histogram
+    * 即对自己的数据计算出s个sample points
+    * */
+  private def doSortedPopHist(param: PopHistParam): Unit = {
+    logger.info(s"查询参数为 : \n$param")
+
+    for (worker <- workers) {
+      worker ! MSG_MW_QUERY_POPHIST(param)
+    }
+  }
 }
 
 
@@ -402,7 +448,7 @@ object Master  {
     * 将各个worker actors计算出的结果汇总后, 整合后装配成一个最终的结果返回给外界的查询者
     * 由于外界往往需要将返回结果组织成json格式,所以这里加了一个`toJson`的方法
     * */
-  final case class CalcResult(succeed: Boolean, msg: String, analysisResult: AnalysisResult) {
+  final case class MasterAnalysisResult(succeed: Boolean, msg: String, analysisResult: WorkerAnalysisResult) {
     def toJson(): String = {
       val gson: Gson = new GsonBuilder().serializeNulls().create()
       val jObj = new JsonObject()
@@ -443,12 +489,21 @@ object Master  {
   }
 
 
-  final case class MSG_MW_STARTLOAD(path: String, start: Int, range: Int)
+  /**
+    * master算出的最终的结果
+    * */
+  final case class Master_PopHistoResult(msg: String) {
 
-  final case class MSG_MW_STARTANALYSIS(optFilter: mutable.HashMap[String, String],
-                                  dimFilter: mutable.HashMap[String, mutable.HashMap[String, Double]],
-                                  targetOptions: Array[String],
-                                  dimIntervals: mutable.HashMap[String, Array[Double]])
+  }
+
+
+
+  final case class MSG_MW_START_LOAD(path: String, start: Int, range: Int)
+
+  final case class MSG_MW_START_ANALYSIS(optFilter: mutable.HashMap[String, String],
+                                         dimFilter: mutable.HashMap[String, mutable.HashMap[String, Double]],
+                                         targetOptions: Array[String],
+                                         dimIntervals: mutable.HashMap[String, Array[Double]])
 
 
   final case class MSG_MS_TEST()
@@ -458,7 +513,7 @@ object Master  {
     * 验证 方法 `mergerAnalysisResults` 的计算正确性
     * */
   def Validate_mergerAnalysisResults(master: Master): Unit = {
-    val M1 = AnalysisResult(
+    val M1 = WorkerAnalysisResult(
       mutable.HashMap("E6"    -> TreeMap(-1 -> 0, 0 -> 0, 1 -> 0, 2 -> 0),
         "E1"    -> TreeMap(-1 -> 0, 0 -> 0, 1 -> 4, 2 -> 5),
         "TOUA"  -> TreeMap(-1 -> 10, 0 -> 9, 1 -> 8, 2 -> 7)),
@@ -469,7 +524,7 @@ object Master  {
         "E"   -> mutable.HashMap("Y" -> 2, "N" -> 25))
     )
 
-    val M2: AnalysisResult = AnalysisResult(
+    val M2: WorkerAnalysisResult = WorkerAnalysisResult(
       mutable.HashMap("E6" -> TreeMap(-1 -> 0, 0 -> 0, 1 -> 0, 2 -> 0),
         "E1" -> TreeMap(-1 -> 0, 0 -> 0, 1 -> 4, 2 -> 5),
         "TOUA" -> TreeMap(-1 -> 10, 0 -> 9, 1 -> 8, 2 -> 7)),
@@ -481,7 +536,7 @@ object Master  {
     )
 
 
-    val M3: AnalysisResult = AnalysisResult(
+    val M3: WorkerAnalysisResult = WorkerAnalysisResult(
       mutable.HashMap("E6" -> TreeMap(-1 -> 0, 0 -> 0, 1 -> 0, 2 -> 0),
         "E1" -> TreeMap(-1 -> 0, 0 -> 0, 1 -> 4, 2 -> 5),
         "TOUA" -> TreeMap(-1 -> 10, 0 -> 9, 1 -> 8, 2 -> 7)),
