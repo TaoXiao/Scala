@@ -43,7 +43,7 @@ jar {
     }
 }
 
-task TestRun(type: JavaExec, dependsOn: 'classes') {
+task TestRun(type: JavaExec, dependsOn: 'classes') << {
     main = 'cn.gridx.scala.aws.simpledb'
     classpath = sourceSets.main.runtimeClasspath
     classpath += configurations.testRun

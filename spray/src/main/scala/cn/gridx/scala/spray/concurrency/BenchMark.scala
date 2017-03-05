@@ -1,8 +1,7 @@
 package cn.gridx.scala.spray.concurrency
 
 import java.util.concurrent.atomic.AtomicInteger
-
-import scalaj.http.{Http, HttpOptions, HttpResponse}
+import scalaj.http._
 
 /**
   * Created by tao on 7/12/16.

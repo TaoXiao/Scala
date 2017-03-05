@@ -18,9 +18,9 @@ object Boot extends App {
   implicit val system = ActorSystem("on-spray-can")
 
   // create and start out service actor
-  val basicService = system.actorOf(Props[BasicServiceActor], "basic-service")
+  // val basicService = system.actorOf(Props[BasicServiceActor], "basic-service")
   val paramService = system.actorOf(Props[ParamServiceActor], "param-service")
-  val httpReqService = system.actorOf(Props[HttpRequestService], "http-request-service")
+  // val httpReqService = system.actorOf(Props[HttpRequestService], "http-request-service")
 
   implicit val timeout = Timeout(2.seconds)  // 引入包 scala.concurrent.duration._ 才能使用seconds
 
@@ -29,8 +29,8 @@ object Boot extends App {
     *
     * start a new HTTP server on port 8881 with our service actor as the handler
     * */
-  IO(Http) ? Http.Bind(basicService,    interface = "localhost", port = 8881)
+  // IO(Http) ? Http.Bind(basicService,    interface = "localhost", port = 8881)
   IO(Http) ? Http.Bind(paramService,    interface = "localhost", port = 8882)
-  IO(Http) ? Http.Bind(httpReqService,  interface = "localhost", port = 8883)
+  //  IO(Http) ? Http.Bind(httpReqService,  interface = "localhost", port = 8883)
 
 }

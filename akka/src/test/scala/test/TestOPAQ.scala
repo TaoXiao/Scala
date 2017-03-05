@@ -1,6 +1,6 @@
 package test
 
-import cn.gridx.scala.akka.app.crossfilter.OPAQ
+// import cn.gridx.scala.akka.app.crossfilter.OPAQ
 import org.testng.annotations.Test
 
 import scala.util.Random
@@ -17,7 +17,7 @@ class TestOPAQ {
       A(i) = Random.nextDouble()
 
     var ts = System.currentTimeMillis()
-    val samples = OPAQ.genSamples(100, A, 0, A.size - 1)
+    // val samples = OPAQ.genSamples(100, A, 0, A.size - 1)
     println(s"耗时: ${(System.currentTimeMillis() - ts)/1000f} 秒")
 
 

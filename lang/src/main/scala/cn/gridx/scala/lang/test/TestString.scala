@@ -7,5 +7,8 @@ import scala.collection.mutable.{ArrayBuffer, HashMap => MMap}
   * Created by tao on 9/24/16.
   */
 object TestString extends App {
-  println(new DateTime("2016-10-20T23:59:59.000-07:00").minusDays(365))
+  val s = "hello\n"
+  val s1 = s.replace("\n", "")
+  println(s"[$s1]")
+
 }

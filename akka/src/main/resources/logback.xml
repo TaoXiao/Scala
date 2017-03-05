@@ -8,11 +8,11 @@
             <evaluator> <!-- defaults to type ch.qos.logback.classic.boolex.JaninoEventEvaluator -->
                 <expression>
                     if( logger.equals("akka.remote.ReliableDeliverySupervisor") &amp;&amp;
-                            formattedMessage.startsWith("Association with remote system ") &amp;&amp;
-                            formattedMessage.contains("Caused by: [Connection refused"))
-                        return true;
+                    formattedMessage.startsWith("Association with remote system ") &amp;&amp;
+                    formattedMessage.contains("Caused by: [Connection refused"))
+                    return true;
                     else
-                        return false;
+                    return false;
                 </expression>
             </evaluator>
             <OnMatch>DENY</OnMatch>

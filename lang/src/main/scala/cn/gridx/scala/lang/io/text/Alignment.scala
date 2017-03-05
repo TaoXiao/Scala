@@ -7,9 +7,7 @@ import java.text.DecimalFormat
   */
 object Alignment {
   def main(args: Array[String]): Unit = {
-    AlignString()
-    println("\n")
-    AlignNumber()
+    RightAlign
   }
 
 
@@ -27,6 +25,18 @@ object Alignment {
 
     val res1 = String.format("%-40s%s", s1, "结束")
     val res2 = String.format("%-40s%s", s2, "结束")
+
+    println(res1)
+    println(res2)
+  }
+
+
+  def RightAlign(): Unit = {
+    val s1 = "Hello world!"
+    val s2 = "Goodbye, earth !"
+
+    val res1 = String.format("%18s |%s", s1, "结束")
+    val res2 = String.format("%18s |%s", s2, "结束")
 
     println(res1)
     println(res2)

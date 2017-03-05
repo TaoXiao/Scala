@@ -26,6 +26,18 @@ object basics {
       case _ => println("没找到")
     }
 
+
+    matchString("a")
+    matchString("")
+    matchString(null)
+  }
+
+
+  def matchString(str: String): Unit = {
+    str match {
+      case s: String =>
+        println(s"字符串为$s")
+    }
   }
 
 }

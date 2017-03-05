@@ -16,5 +16,22 @@ object TestCaseClass {
         val p2 = Person()
         val p3 = Person("Xiao")
         val p4 = Person(30)
+
+
+        val a = "Hello"
+        val b = 100
+        val c = 99.9999
+        val B = Bean(b = b, c = c, a = a)
+        println(B)
+    }
+}
+
+case class Bean(a: String, b: Int,  c: Double) {
+    override
+    def toString(): String = {
+        s"""a = $a
+           |b = $b
+           |c = $c
+         """.stripMargin
     }
 }

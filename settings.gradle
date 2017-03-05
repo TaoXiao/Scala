@@ -6,4 +6,6 @@ include 'database'
 include 'pooling'
 include 'plugin'
 include 'logback'
+include 'aop'
+include 'zookeeper'
 

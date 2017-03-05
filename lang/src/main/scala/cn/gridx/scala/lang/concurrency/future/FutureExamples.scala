@@ -3,6 +3,8 @@ package cn.gridx.scala.lang.concurrency.future
 import java.io.{File, PrintWriter}
 import java.util.Timer
 
+import akka.util.Timeout
+
 import scala.collection.immutable.IndexedSeq
 import scala.concurrent.{Await, Future, future}
 
@@ -30,12 +32,30 @@ import scala.util.{Failure, Random, Success}
  */
 object FutureExamples {
     def main(args: Array[String]): Unit = {
-        NonblockingExample()
+      testMap()
     }
 
 
     //////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+
+    def testMap(): Unit = {
+      println("开始")
+
+      val f: Future[Int] = Future {
+        val x = 100
+        Thread.sleep(1000*2)
+        x/0
+      } map { x =>
+        println(x)
+        x
+      }
+
+      println("等待")
+      Thread.sleep(1000*3)
+
+      println("结束")
+    }
 
     /**
      * 阻塞地使用`Future`的一个例子
@@ -295,11 +315,28 @@ object FutureExamples {
             // 应该表述为，Await.result抛出超时异常对Future本身没有影响
             Await.result(f, 2 second)
         } catch {
-            case _ => println("捕获了Future超时的异常")
+            case _: Throwable => println("捕获了Future超时的异常")
         }
 
         Thread.sleep(10000)
 
         println("主线程退出")
+    }
+
+
+    def ExceptionInFuture(): Unit = {
+        val f = future {
+            println("进入future")
+            Thread.sleep(5*1000)
+            if (true) {
+                println("将要抛出异常 ... ")
+                throw new RuntimeException("Hi")
+            }
+            println("退出future")
+        }
+
+        Await.result(f, Timeout(10 seconds).duration)
+
+        println("我在哪里")
     }
 }

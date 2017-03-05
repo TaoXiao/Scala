@@ -1,7 +1,26 @@
+buildscript {
+    repositories {
+        jcenter()
+        mavenCentral()
+        maven {
+            url "https://plugins.gradle.org/m2/"
+        }
+    }
+    dependencies {
+        classpath   'com.github.jengelman.gradle.plugins:shadow:1.2.2'
+        classpath   'cn.gridx:s3syncer:1.1-RELEASE'
+        classpath   'gradle.plugin.net.minecraftforge.gradle:ForgeGradle:2.0.2'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'application'
+apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 's3sync-plugin'
+
+
 group 'cn.gridx'
 version '1.0-RELEASE'
-
-sourceCompatibility = 1.7
 
 repositories {
     mavenCentral()
@@ -23,17 +42,28 @@ sourceSets {
     }
 }
 
+/*
+configurations {
+    patch
+    patch.extendsFrom(compile)
+}
+*/
 
 dependencies {
     testCompile group: 'junit', name: 'junit', version: '4.11'
-    compile 'org.apache.hbase:hbase-server:0.98.6-cdh5.3.5',
-            'joda-time:joda-time:2.6',
-            'org.json4s:json4s-jackson_2.10:3.2.11',
-            'org.yaml:snakeyaml:1.13',
-            'org.scala-lang:scala-actors:2.10.4',
-            'com.github.scopt:scopt_2.10:3.2.0',
-            'mysql:mysql-connector-java:5.1.39'
-
+    compile 'org.apache.hbase:hbase-server:0.98.6-cdh5.3.5' ,
+            'joda-time:joda-time:2.6'                       ,
+            'org.json4s:json4s-jackson_2.10:3.2.10'         ,
+            'com.cloudphysics:jerkson_2.10:0.6.3'           ,
+            'org.yaml:snakeyaml:1.13'                       ,
+            'org.scala-lang:scala-actors:2.10.4'            ,
+            'com.github.scopt:scopt_2.10:3.2.0'             ,
+            'mysql:mysql-connector-java:5.1.39'             ,
+            'io.spray:spray-json_2.10:1.3.3'                ,
+            'io.spray:spray-httpx_2.10:1.3.3'               ,
+            'org.scalaj:scalaj-http_2.10:2.3.0'             ,
+            'org.scala-lang:scala-library:2.10.1'           ,
+            'org.clapper:classutil_2.10:1.1.1'
 }
 
 
@@ -44,3 +74,12 @@ jar {
 
     exclude('org/slf4j/**')
 }
+
+
+/*
+task patch {
+    project.ant {
+        taskdef name: ''
+    }
+}
+*/

@@ -1,7 +1,8 @@
 package cn.gridx.scala.spray.routing
 
 import akka.actor.Actor
-import spray.routing.HttpService
+import spray.http.{MediaTypes, MediaType}
+import spray.routing.{RequestContext, Route, HttpService}
 
 /**
   * Created by tao on 2/29/16.
@@ -109,9 +110,24 @@ trait ParamService extends HttpService {
       }
     }
 
+
+  def optionalParam: Route = (path("removelist") & get & parameters('fkey.as[String]?)) { fkey =>
+      val realKey = fkey.getOrElse("xxx")
+      println(realKey)
+      complete(realKey)
+  }
+
+
+  def noCtxRoute: Route = (path("noCtx") & get & parameters('fkey.as[String]?)) { fkey =>
+    val realKey = fkey.getOrElse("xxx")
+    println(realKey)
+    complete(realKey)
+  }
+
   val myRoute =
-    paramMatcher1 ~ paramMatcher2 ~ paramMatcher3 ~ paramMatcher4 ~
-      postParamMatcher
+    /* paramMatcher1 ~ paramMatcher2 ~ paramMatcher3 ~ paramMatcher4 ~
+      postParamMatcher ~ */
+      optionalParam ~ noCtxRoute
 
 
 }

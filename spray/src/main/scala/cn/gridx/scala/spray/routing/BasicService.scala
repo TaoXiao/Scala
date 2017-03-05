@@ -30,6 +30,7 @@ trait BasicService extends HttpService {
         }
       }
     } ~
+    //
     path("hello") { // 浏览器访问 http://localhost:8881/hello
       get {
         complete {
@@ -61,5 +62,9 @@ trait BasicService extends HttpService {
           }
         }
       }
-    }
+    } ~
+      (path("testSeg" / Segment / Segment ) & get) { (a, b) =>
+        println(a + ":" + b)
+        complete("返回testSeg")
+      }
 }

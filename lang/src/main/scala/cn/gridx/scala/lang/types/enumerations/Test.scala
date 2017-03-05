@@ -22,6 +22,8 @@ object Test {
     println(isWorkingDay(x.day))
 
     println(x.day)
+
+    println(WeekDay.withName("Sunday"))
   }
 
 

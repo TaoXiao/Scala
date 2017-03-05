@@ -1,6 +1,6 @@
 package test
 
-import cn.gridx.scala.akka.app.crossfilter.CalcUsageImpact
+// import cn.gridx.scala.akka.app.crossfilter.CalcUsageImpact
 import org.testng.annotations.Test
 
 
@@ -11,6 +11,6 @@ class TestCalcUsageImpact {
   @Test
   def testMyCase() {
     // CalcUsageImpact.calcByDiff("/Users/tao/Documents/data_2.txt", "/Users/tao/Documents/data_2.impact", null,  CalcUsageImpact.AbsDiffMode())
-    CalcUsageImpact.calcByDiff("/Users/tao/Documents/data_2.txt", "/Users/tao/Documents/data_2.impact", null,  CalcUsageImpact.PercentMode())
+    // CalcUsageImpact.calcByDiff("/Users/tao/Documents/data_2.txt", "/Users/tao/Documents/data_2.impact", null,  CalcUsageImpact.PercentMode())
   }
 }

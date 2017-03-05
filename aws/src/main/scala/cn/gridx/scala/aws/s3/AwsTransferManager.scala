@@ -9,9 +9,9 @@ import com.amazonaws.services.s3.transfer.TransferManager
   * Created by tao on 9/22/16.
   */
 object AwsTransferManager extends App {
-  var srcPath     : String  = "/Users/tao/Dropbox/realtime/src"
-  var dstBucket   : String  = "gridx-realtime"
-  var dstKey      : String  = "crossfilter/xxx/yyyy/yili"
+  var srcPath     : String  = "/Users/tao/IdeaProjects/gridx/pipeline-common/build/deploy/akka/conf"
+  var dstBucket   : String  = "zk-realtime-configs"
+  var dstKey      : String  = "SA-ID/test"
 
   val credentials = new ProfileCredentialsProvider()
   val tx = new TransferManager(credentials)

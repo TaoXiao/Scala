@@ -2,30 +2,14 @@ package cn.gridx.scala.lang.datetime
 
 import java.util.Date
 
-import org.joda.time.DateTime
+import org.joda.time._
 
 /**
   * Created by tao on 12/21/15.
   */
 object jodatimes {
   def main(args: Array[String]): Unit = {
-    val d1 = new DateTime("2015-04-16T00:00:00.000-07:00")
-    val d2 = new DateTime("2015-04-16T23:00:00.000-07:00")
-    val t1 = new DateTime("2015-04-16T20:00:00.000-07:00")
-    val t2 = new DateTime("2015-05-16T20:00:00.000-07:00")
-    if (!t1.isBefore(d1) && !t1.isAfter(d2))
-      println("t1 yes")
-    else
-      println("t1 no")
-
-    if (!t2.isBefore(d1) && !t2.isAfter(d2))
-      println("t2 yes")
-    else
-      println("t2 no")
-    // compareDate
-    // long2Date
-    // moveDate
-    // getSharpClock
+    getWeekDay
   }
 
   /**
@@ -71,5 +55,68 @@ object jodatimes {
     val today =  new DateTime(System.currentTimeMillis())
     val hour = today.getHourOfDay
     println(hour)
+  }
+
+
+  /**
+    * 计算两个点之间的间隔时长
+    * */
+  def calcInterval(): Unit = {
+    var d1 = new DateTime("2016-01-01T12:00:00")
+    var d2 = new DateTime("2016-01-02T13:20:30")
+    val days = Days.daysBetween(d1, d2).getDays
+    println(s"days = $days")
+
+    d1 = new DateTime("2016-01-01T12:00:00")
+    d2 = new DateTime("2016-01-01T13:20:30")
+    val hours = Hours.hoursBetween(d1, d2).getHours
+    println(s"hours = $hours")
+
+    val minutes = Minutes.minutesBetween(d1, d2).getMinutes
+    println(s"minutes = $minutes")
+
+    val seconds = Seconds.secondsBetween(d1, d2).getSeconds
+    println(s"seconds = $seconds")
+  }
+
+
+  /**
+    * 找到给定日期的00:00:00这个时刻
+    * */
+  def startOfSameDay(d: DateTime) = {
+    val year    = d.getYear
+    val month   = d.getMonthOfYear
+    val day     = d.getDayOfMonth
+    val hour    = d.getHourOfDay
+    val minute  = d.getMinuteOfHour
+    val second  = d.getSecondOfMinute
+
+    new DateTime(s"${year}-${month}-${day}")
+  }
+
+
+
+  /**
+    * 2015-02-01T13:59:00-08:00   ->    2015-02-02T00:00:00.000-08:00
+    * */
+  private def startOfNextDay(d: DateTime) = {
+    val year    = d.getYear
+    val month   = d.getMonthOfYear
+    val day     = d.getDayOfMonth
+    val hour    = d.getHourOfDay
+    val minute  = d.getMinuteOfHour
+    val second  = d.getSecondOfMinute
+
+    new DateTime(s"${year}-${month}-${day}").plusDays(1)
+  }
+
+  /**
+    * 判断是周几?
+    * 是工作日还是周末?
+    * */
+  private def getWeekDay(): Unit = {
+    val d = new DateTime("2017-01-01")
+    println(d)
+    println(s"dayOfWeek = ${d.getDayOfWeek}")
   }
 }

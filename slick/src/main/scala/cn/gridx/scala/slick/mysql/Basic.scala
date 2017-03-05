@@ -5,6 +5,7 @@ package cn.gridx.scala.slick.mysql
  from the driver and other parts of Slick such as session handling
 */
 import scala.slick.driver.MySQLDriver.simple._
+import scala.slick.jdbc.meta.MTable
 
 
 /**
@@ -28,7 +29,7 @@ object Basic extends App {
     def DB     = "slick"
     def TABLE  = "Persons"
     def Driver = "com.mysql.jdbc.Driver"
-    def User   = "root"
+    def User   = "xiaotao"
     def Passwd = "njzd2014"
 
     // 首选定义表的名称及结构
@@ -42,6 +43,8 @@ object Basic extends App {
       // as the table's type parameter
       def * = id ~ name ~ gender ~ age
     }
+
+    var ts = System.currentTimeMillis()
 
     /************************************************
       * 创建表
@@ -59,10 +62,20 @@ object Basic extends App {
          * The session is never named explicitly. It is bound to the current thread
          * as the `threadLocalSession` we imported
          * */
-        // 删除表
-        Persons.ddl.drop
+        println(s"建立连接数据耗时 ${System.currentTimeMillis() - ts} 毫秒")
+        ts = System.currentTimeMillis()
+
+        // 首先删除表（如果不存在的话）
+        if (MTable.getTables(TABLE).list().nonEmpty) {
+          Persons.ddl.drop
+          println(s"删除表耗时 ${System.currentTimeMillis() - ts} 毫秒")
+          ts = System.currentTimeMillis()
+        }
+
         // 创建表
         Persons.ddl.create
+        println(s"建立表耗时 ${System.currentTimeMillis() - ts} 毫秒")
+        ts = System.currentTimeMillis()
 
         /************************************************
           * 向表中插入数据
@@ -77,6 +90,9 @@ object Basic extends App {
             (3, "Lucy",  "Female",  20),
             (4, "Grace", "Female",  30),
             (5, "Pig",   "Male",    40))
+
+        println(s"插入数据耗时 ${System.currentTimeMillis() - ts} 毫秒")
+        ts = System.currentTimeMillis()
 
 
         /************************************************
@@ -93,6 +109,9 @@ object Basic extends App {
             case (id, name, gender, age) =>
                 println(s"id: $id, name: $name, gender: $gender, age:$age")
         }
+
+        println(s"遍历数据耗时 ${System.currentTimeMillis() - ts} 毫秒")
+        ts = System.currentTimeMillis()
 
         /************************************************
           * 对表进行条件查询
@@ -121,7 +140,8 @@ object Basic extends App {
          for (x <- res3)
              println(x)
 
-
+        println(s"查询数据耗时 ${System.currentTimeMillis() - ts} 毫秒")
+        ts = System.currentTimeMillis()
 
         /********************************************************
          * 让数据库进行数据的转换（to string）和操作（字符串 连接）
@@ -138,8 +158,7 @@ object Basic extends App {
 
         res4 foreach println
 
+        println(s"转换数据耗时 ${System.currentTimeMillis() - ts} 毫秒")
+        ts = System.currentTimeMillis()
     }
-
-
-
 }
